@@ -58,7 +58,11 @@ def git_identity(root: Path = REPO_ROOT) -> tuple[str | None, str, bool | None]:
 
 
 def build_baseline_snapshot(
-    settings: Settings, pipeline: PipelineConfig, *, root: Path = REPO_ROOT
+    settings: Settings,
+    pipeline: PipelineConfig,
+    *,
+    root: Path = REPO_ROOT,
+    provider_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     catalog_bytes = settings.data.reference_catalog_path.read_bytes()
     commit, status, clean = git_identity(root)
@@ -69,6 +73,7 @@ def build_baseline_snapshot(
         "working_tree_clean": clean,
         "source_tree_sha256": source_tree_hash(root),
         "provider": settings.llm.provider,
+        "provider_base_url": settings.llm.base_url,
         "model": settings.llm.model,
         "temperature": settings.llm.temperature,
         "rater_prompt_version": pipeline.rater.prompt_version,
@@ -89,15 +94,21 @@ def build_baseline_snapshot(
         "catalog_fingerprint": hashlib.sha256(catalog_bytes).hexdigest(),
         "pipeline_config_file": settings.pipeline_config_file,
         "pipeline_config": pipeline.model_dump(mode="json"),
+        "provider_metadata": provider_metadata,
     }
     snapshot["config_hash"] = canonical_hash(snapshot)
     return snapshot
 
 
-def write_baseline_snapshot(output: Path, settings: Settings | None = None) -> dict[str, Any]:
+def write_baseline_snapshot(
+    output: Path,
+    settings: Settings | None = None,
+    *,
+    provider_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     resolved = settings or Settings()
     pipeline = load_pipeline_config(resolved.pipeline_config_path)
-    snapshot = build_baseline_snapshot(resolved, pipeline)
+    snapshot = build_baseline_snapshot(resolved, pipeline, provider_metadata=provider_metadata)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return snapshot

@@ -6,7 +6,7 @@ VENV := .venv
 PYTHON := $(VENV)/bin/python
 UV := $(shell command -v uv 2>/dev/null)
 
-.PHONY: help setup reference-data generate-eval validate-eval generate-dev validate-dev freeze-baseline evaluate-baseline test lint fmt typecheck check run smoke-llm clean
+.PHONY: help setup reference-data generate-eval validate-eval generate-dev validate-dev ollama-preflight freeze-baseline evaluate-baseline test lint fmt typecheck check run smoke-llm clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -41,6 +41,9 @@ generate-dev: $(VENV)/bin/python ## Reproduce the separate 400-sample diagnostic
 
 validate-dev: $(VENV)/bin/python ## Validate diagnostic integrity and zero holdout overlap
 	$(PYTHON) -m app.evaluation.validate_dev data/evaluation/dev/v1/diagnostic.jsonl
+
+ollama-preflight: $(VENV)/bin/python ## Verify local Ollama, model digest, and structured output
+	$(PYTHON) -m app.evaluation.preflight_ollama
 
 freeze-baseline: $(VENV)/bin/python ## Snapshot redacted baseline configuration and source identity
 	$(PYTHON) -m app.evaluation.freeze_baseline \

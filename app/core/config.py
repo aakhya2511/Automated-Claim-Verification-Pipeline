@@ -13,6 +13,7 @@ from __future__ import annotations
 import functools
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,7 +23,7 @@ from app.core.exceptions import ConfigurationError
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 Environment = Literal["local", "test", "staging", "production"]
-RaterProvider = Literal["fake", "openai"]
+RaterProvider = Literal["fake", "openai", "ollama"]
 LogFormat = Literal["json", "console"]
 
 
@@ -72,7 +73,15 @@ class LLMSettings(_Section):
 
     @property
     def requires_credentials(self) -> bool:
-        return self.provider != "fake"
+        return self.provider == "openai"
+
+    @model_validator(mode="after")
+    def _validate_provider_endpoint(self) -> Self:
+        if self.provider == "ollama" and self.base_url is not None:
+            parsed = urlparse(self.base_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("Ollama base_url must be an absolute HTTP(S) URL")
+        return self
 
 
 class DataSettings(_Section):

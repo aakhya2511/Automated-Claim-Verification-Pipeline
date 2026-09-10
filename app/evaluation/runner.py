@@ -13,9 +13,10 @@ from app.bootstrap import build_container
 from app.core.config import Settings
 from app.core.pipeline_config import PipelineConfig
 from app.domain.enums import Verdict
-from app.evaluation.baseline import canonical_hash
+from app.evaluation.baseline import canonical_hash, git_identity, source_tree_hash
 from app.evaluation.dev_corpus import validate_dev_bundle
 from app.evaluation.metrics import PredictionRow, calculate_metrics, prediction_from_result
+from app.evaluation.models import EvaluationSample
 from app.evaluation.reporting import (
     error_analysis,
     error_markdown,
@@ -23,12 +24,21 @@ from app.evaluation.reporting import (
     summary_markdown,
 )
 from app.evaluation.validator import load_samples
+from app.raters.ollama import preflight_ollama
 
 FROZEN_HOLDOUT_SHA256 = "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7"
+CHECKPOINT_BATCH_SIZE = 10
 
 
 class EvaluationRunError(RuntimeError):
     pass
+
+
+def validate_real_provider(settings: Settings) -> None:
+    if settings.llm.provider == "fake":
+        raise EvaluationRunError("official baseline requires a configured real LLM provider")
+    if settings.llm.provider == "openai" and settings.llm.api_key is None:
+        raise EvaluationRunError("official OpenAI baseline requires a configured credential")
 
 
 def assert_not_holdout(dataset: Path) -> None:
@@ -51,42 +61,67 @@ async def run_evaluation(
     assert_not_holdout(dataset)
     resolved = settings or Settings()
     snapshot = load_snapshot(config_path)
-    if resolved.llm.provider == "fake" or resolved.llm.api_key is None:
-        raise EvaluationRunError("official baseline requires a configured real LLM provider")
+    commit, _status, clean = git_identity()
+    if commit is None or clean is not True:
+        raise EvaluationRunError("official baseline requires a valid Git commit and clean tree")
+    if snapshot.get("git_commit") != commit:
+        raise EvaluationRunError("current Git commit does not match frozen baseline")
+    if snapshot.get("source_tree_sha256") != source_tree_hash():
+        raise EvaluationRunError("current source tree does not match frozen baseline")
+    validate_real_provider(resolved)
     if snapshot["provider"] != resolved.llm.provider or snapshot["model"] != resolved.llm.model:
         raise EvaluationRunError("runtime provider/model does not match frozen baseline")
+    if snapshot.get("provider_base_url") != resolved.llm.base_url:
+        raise EvaluationRunError("runtime provider endpoint does not match frozen baseline")
+    if resolved.llm.provider == "ollama":
+        identity = await preflight_ollama(resolved.llm)
+        frozen_identity = snapshot.get("provider_metadata")
+        if not isinstance(frozen_identity, dict) or (
+            frozen_identity.get("model_digest") != identity.model_digest
+        ):
+            raise EvaluationRunError("Ollama model digest does not match frozen baseline")
     validate_dev_bundle(
         dataset,
         catalog_path=resolved.data.reference_catalog_path,
         holdout_path=resolved.data.evaluation_dataset_path,
     )
     pipeline = PipelineConfig.model_validate(snapshot["pipeline_config"])
+    samples = load_samples(dataset)
+    dataset_sha256 = await asyncio.to_thread(_file_hash, dataset)
+    checkpoint_rows = await asyncio.to_thread(
+        load_or_initialize_checkpoint,
+        output,
+        samples,
+        dataset_sha256=dataset_sha256,
+        config_hash=str(snapshot["config_hash"]),
+        provider=resolved.llm.provider,
+        model=resolved.llm.model,
+    )
     container = build_container(settings=resolved, pipeline_config=pipeline)
     if container.service is None:
         raise EvaluationRunError("verification service was not constructed")
-    samples = load_samples(dataset)
     started = perf_counter()
     try:
-        results = []
-        batch_size = resolved.server.max_batch_items
-        for offset in range(0, len(samples), batch_size):
-            batch = samples[offset : offset + batch_size]
-            results.extend(
-                await container.service.verify_batch(
-                    [sample.to_verification_request() for sample in batch]
-                )
+        completed_ids = {row.sample_id for row in checkpoint_rows}
+        pending = [sample for sample in samples if sample.sample_id not in completed_ids]
+        for offset in range(0, len(pending), CHECKPOINT_BATCH_SIZE):
+            batch = pending[offset : offset + CHECKPOINT_BATCH_SIZE]
+            results = await container.service.verify_batch(
+                [sample.to_verification_request() for sample in batch]
             )
+            checkpoint_rows.extend(
+                prediction_from_result(sample, result)
+                for sample, result in zip(batch, results, strict=True)
+            )
+            checkpoint_rows = _order_rows(checkpoint_rows, samples)
+            await asyncio.to_thread(write_checkpoint, output, checkpoint_rows)
     finally:
         await container.aclose()
-    rows = [
-        prediction_from_result(sample, result)
-        for sample, result in zip(samples, results, strict=True)
-    ]
+    rows = _order_rows(checkpoint_rows, samples)
     if len(rows) != len(samples):
         raise EvaluationRunError("prediction count does not match diagnostic sample count")
     metrics = calculate_metrics(rows)
     analysis = error_analysis(rows)
-    dataset_sha256 = await asyncio.to_thread(_file_hash, dataset)
     summary = {
         "status": "COMPLETE",
         "dataset_sha256": dataset_sha256,
@@ -119,12 +154,12 @@ def _missed_mismatches(rows: list[PredictionRow]) -> list[PredictionRow]:
 
 
 def _write_json(path: Path, value: object) -> None:
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_text(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
 def _write_jsonl(path: Path, rows: list[PredictionRow]) -> None:
     content = "\n".join(row.model_dump_json() for row in rows)
-    path.write_text(content + ("\n" if rows else ""), encoding="utf-8")
+    _atomic_text(path, content + ("\n" if rows else ""))
 
 
 def _file_hash(path: Path) -> str:
@@ -145,9 +180,68 @@ def _write_artifacts(
     _write_json(output / "routing.json", metrics["routing"])
     _write_json(output / "latency.json", metrics["latency"])
     _write_json(output / "error_analysis.json", analysis)
-    (output / "summary.md").write_text(summary_markdown(metrics, analysis), encoding="utf-8")
-    (output / "error_analysis.md").write_text(error_markdown(analysis), encoding="utf-8")
-    (output / "phase7_hypotheses.md").write_text(hypotheses_markdown(analysis), encoding="utf-8")
+    _atomic_text(output / "summary.md", summary_markdown(metrics, analysis))
+    _atomic_text(output / "error_analysis.md", error_markdown(analysis))
+    _atomic_text(output / "phase7_hypotheses.md", hypotheses_markdown(analysis))
     _write_jsonl(output / "false_positives.jsonl", _false_positives(rows))
     _write_jsonl(output / "missed_mismatches.jsonl", _missed_mismatches(rows))
     _write_json(output / "summary.json", summary)
+
+
+def load_or_initialize_checkpoint(
+    output: Path,
+    samples: list[EvaluationSample],
+    *,
+    dataset_sha256: str,
+    config_hash: str,
+    provider: str,
+    model: str,
+) -> list[PredictionRow]:
+    output.mkdir(parents=True, exist_ok=True)
+    metadata_path = output / "checkpoint.meta.json"
+    predictions_path = output / "checkpoint.jsonl"
+    expected_metadata = {
+        "dataset_sha256": dataset_sha256,
+        "config_hash": config_hash,
+        "provider": provider,
+        "model": model,
+    }
+    if metadata_path.exists():
+        actual_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if actual_metadata != expected_metadata:
+            raise EvaluationRunError("checkpoint identity does not match this baseline run")
+    else:
+        if predictions_path.exists():
+            raise EvaluationRunError("checkpoint predictions exist without identity metadata")
+        _write_json(metadata_path, expected_metadata)
+    rows = (
+        [
+            PredictionRow.model_validate_json(line)
+            for line in predictions_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if predictions_path.exists()
+        else []
+    )
+    sample_ids = {sample.sample_id for sample in samples}
+    row_ids = [row.sample_id for row in rows]
+    if len(row_ids) != len(set(row_ids)):
+        raise EvaluationRunError("checkpoint contains duplicate sample IDs")
+    if not set(row_ids) <= sample_ids:
+        raise EvaluationRunError("checkpoint contains samples outside the diagnostic corpus")
+    return rows
+
+
+def write_checkpoint(output: Path, rows: list[PredictionRow]) -> None:
+    _write_jsonl(output / "checkpoint.jsonl", rows)
+
+
+def _order_rows(rows: list[PredictionRow], samples: list[EvaluationSample]) -> list[PredictionRow]:
+    order = {sample.sample_id: index for index, sample in enumerate(samples)}
+    return sorted(rows, key=lambda row: order[row.sample_id])
+
+
+def _atomic_text(path: Path, content: str) -> None:
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(content, encoding="utf-8")
+    temporary.replace(path)

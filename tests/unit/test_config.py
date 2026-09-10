@@ -19,6 +19,20 @@ class TestSettings:
         with pytest.raises(ValueError, match="ACV_LLM__API_KEY"):
             Settings(_env_file=None, llm=LLMSettings(provider="openai"))
 
+    def test_ollama_provider_requires_no_key(self) -> None:
+        settings = Settings(
+            _env_file=None,
+            llm=LLMSettings(
+                provider="ollama", base_url="http://127.0.0.1:11434/api", model="qwen2.5:7b"
+            ),
+        )
+        assert settings.llm.requires_credentials is False
+        assert settings.llm.api_key is None
+
+    def test_ollama_rejects_invalid_endpoint(self) -> None:
+        with pytest.raises(ValueError, match="absolute HTTP"):
+            LLMSettings(provider="ollama", base_url="localhost:11434/api")
+
     def test_debug_endpoints_rejected_in_production(self) -> None:
         with pytest.raises(ValueError, match="production"):
             Settings(

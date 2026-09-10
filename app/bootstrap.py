@@ -23,6 +23,7 @@ from app.domain.interfaces import ClaimExtractor, LLMRater
 from app.normalization.claim_parser import DeterministicClaimNormalizer
 from app.normalization.features import FeatureResolver, vocabulary_from_records
 from app.raters.extractor import OpenAIClaimExtractor
+from app.raters.ollama import OllamaClaimExtractor, OllamaRater, OllamaTransport
 from app.raters.openai import OpenAIRater
 from app.raters.transport import OpenAIResponsesTransport
 from app.retrieval.evidence import ReferenceEvidenceRetriever
@@ -93,6 +94,18 @@ def build_container(
             prompt_version=resolved_config.rater.prompt_version,
         )
         extractor = OpenAIClaimExtractor(resolved_settings.llm, transport=transport)
+    elif resolved_settings.llm.provider == "ollama":
+        ollama_transport = OllamaTransport(resolved_settings.llm)
+        rater = OllamaRater(
+            resolved_settings.llm,
+            transport=ollama_transport,
+            prompt_version=resolved_config.rater.prompt_version,
+        )
+        extractor = OllamaClaimExtractor(
+            resolved_settings.llm,
+            transport=ollama_transport,
+            prompt_version=resolved_settings.llm.extraction_prompt_version,
+        )
 
     clock = SystemClock()
     feature_resolver = FeatureResolver(vocabulary_from_records(repository.all_records()))

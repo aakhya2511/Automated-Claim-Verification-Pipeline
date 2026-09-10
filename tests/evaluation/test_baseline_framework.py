@@ -29,8 +29,10 @@ from app.evaluation.reporting import error_analysis
 from app.evaluation.runner import (
     EvaluationRunError,
     assert_not_holdout,
+    load_or_initialize_checkpoint,
     load_snapshot,
-    run_evaluation,
+    validate_real_provider,
+    write_checkpoint,
 )
 from app.evaluation.validator import load_samples
 
@@ -183,11 +185,43 @@ def test_baseline_config_hash_detects_tampering(tmp_path: Path) -> None:
         load_snapshot(path)
 
 
-async def test_official_runner_rejects_fake_provider(tmp_path: Path) -> None:
+def test_official_runner_rejects_fake_provider() -> None:
     with pytest.raises(EvaluationRunError, match="real LLM provider"):
-        await run_evaluation(
-            dataset=DIAGNOSTIC,
-            config_path=Path("experiments/baseline/v1/config.json"),
-            output=tmp_path,
-            settings=Settings(_env_file=None),
+        validate_real_provider(Settings(_env_file=None))
+
+
+def test_checkpoint_is_atomic_ordered_unique_and_identity_bound(tmp_path: Path) -> None:
+    samples = load_samples(DIAGNOSTIC)[:2]
+    assert (
+        load_or_initialize_checkpoint(
+            tmp_path,
+            samples,
+            dataset_sha256="dataset-a",
+            config_hash="config-a",
+            provider="ollama",
+            model="model-a",
         )
+        == []
+    )
+    second = row(samples[1].sample_id, Verdict.SUPPORTED, Verdict.SUPPORTED, latency=1)
+    first = row(samples[0].sample_id, Verdict.SUPPORTED, Verdict.SUPPORTED, latency=1)
+    write_checkpoint(tmp_path, [first, second])
+    resumed = load_or_initialize_checkpoint(
+        tmp_path,
+        samples,
+        dataset_sha256="dataset-a",
+        config_hash="config-a",
+        provider="ollama",
+        model="model-a",
+    )
+    assert [item.sample_id for item in resumed] == [samples[0].sample_id, samples[1].sample_id]
+    with pytest.raises(EvaluationRunError, match="identity"):
+        load_or_initialize_checkpoint(
+            tmp_path,
+            samples,
+            dataset_sha256="dataset-a",
+            config_hash="different-config",
+            provider="ollama",
+            model="model-a",
+        )
+    assert not list(tmp_path.glob(".*.tmp"))

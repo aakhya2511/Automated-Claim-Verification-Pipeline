@@ -25,6 +25,10 @@ htmlcov/
 artifacts/*
 !artifacts/.gitkeep
 
+# Baseline run identity is generated after the clean source commit.
+experiments/baseline/*/config.json
+experiments/baseline/*/metadata.json
+
 # OS / editor
 .DS_Store
 .idea/

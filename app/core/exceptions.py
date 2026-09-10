@@ -117,6 +117,14 @@ class RaterError(ClaimVerificationError):
     retryable = False
 
 
+class OllamaModelNotFoundError(RaterError):
+    """Configured Ollama model is absent from the local model registry."""
+
+    code = "ollama_model_not_found"
+    status_code = 503
+    retryable = False
+
+
 class RaterTimeoutError(RaterError):
     code = "llm_timeout"
     retryable = True

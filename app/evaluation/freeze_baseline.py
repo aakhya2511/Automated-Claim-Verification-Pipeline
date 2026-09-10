@@ -3,16 +3,28 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from pathlib import Path
 
+from app.core.config import Settings
+from app.core.exceptions import RaterError
 from app.evaluation.baseline import write_baseline_snapshot
+from app.raters.ollama import preflight_ollama
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("experiments/baseline/v1/config.json"))
     args = parser.parse_args()
-    snapshot = write_baseline_snapshot(args.output)
+    settings = Settings()
+    provider_metadata = None
+    if settings.llm.provider == "ollama":
+        try:
+            provider_metadata = asyncio.run(preflight_ollama(settings.llm)).model_dump(mode="json")
+        except RaterError as exc:
+            print(f"baseline_freeze=FAILED: {exc.message}")
+            return 2
+    snapshot = write_baseline_snapshot(args.output, settings, provider_metadata=provider_metadata)
     print(f"baseline_config={args.output}")
     print(f"config_hash={snapshot['config_hash']}")
     print(f"provider={snapshot['provider']}")
