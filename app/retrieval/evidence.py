@@ -67,22 +67,10 @@ _PROJECTIONS: dict[ClaimType, tuple[Attribute, ...]] = {
     ClaimType.MINIMUM_PURCHASE: (Attribute.MINIMUM_PURCHASE, Attribute.PRICE),
 }
 
-#: Used when the claim could not be classified. Deliberately compact: an
-#: unparsed claim goes to the rater, and a smaller projection keeps that prompt
-#: from filling with irrelevant numbers.
-_FALLBACK_PROJECTION: tuple[Attribute, ...] = (
-    Attribute.PRICE,
-    Attribute.CURRENCY,
-    Attribute.DISCOUNT_PERCENT,
-    Attribute.FREE_SHIPPING,
-    Attribute.INVENTORY_STATUS,
-    Attribute.TRIAL_DAYS,
-    Attribute.SUBSCRIPTION_PRICE,
-    Attribute.INCLUDED_FEATURES,
-    Attribute.EXCLUDED_FEATURES,
-    Attribute.OFFER_END,
-    Attribute.ELIGIBLE_REGIONS,
-)
+#: An unclassified assertion has no defensible answering field.  Sending a
+#: grab bag of otherwise authoritative values invites the semantic rater to
+#: establish or refute a different proposition than the one stated.
+_FALLBACK_PROJECTION: tuple[Attribute, ...] = ()
 
 _ALL_ATTRIBUTES: tuple[Attribute, ...] = tuple(
     attribute for attribute in Attribute if attribute is not Attribute.UNKNOWN
@@ -240,7 +228,7 @@ class ReferenceEvidenceRetriever:
                 if attribute not in attributes:
                     attributes.append(attribute)
 
-        if self._config.include_terms_text:
+        if self._config.include_terms_text and claim.claim_type is not ClaimType.UNKNOWN:
             attributes.append(Attribute.TERMS)
         return tuple(attributes)
 

@@ -80,6 +80,7 @@ REGION_CUES: tuple[str, ...] = (
     "restricted to",
     "limited to",
     "buyers in",
+    "applies to",
 )
 
 

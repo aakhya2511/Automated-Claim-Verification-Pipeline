@@ -136,12 +136,67 @@ class TestShippingClaims:
         assert result.operator is Operator.IS_TRUE
         assert result.value is True
 
+    async def test_shipping_is_free_for_entity_is_not_a_trial(self, normalizer) -> None:
+        result = await parse(normalizer, "Shipping is free for Product X.")
+        assert result.claim_type is ClaimType.SHIPPING
+        assert result.attribute is Attribute.FREE_SHIPPING
+        assert result.value is True
+
     async def test_negated_free_shipping_flips_the_boolean(self, normalizer) -> None:
         result = await parse(normalizer, "Product X does not include free shipping.")
         assert result.attribute is Attribute.FREE_SHIPPING
         assert result.operator is Operator.IS_FALSE
         assert result.value is False
         assert result.negated is True
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "No shipping charge applies to Product X.",
+            "There is no delivery fee for Product X.",
+        ],
+    )
+    async def test_no_shipping_charge_asserts_free_shipping(self, normalizer, claim: str) -> None:
+        result = await parse(normalizer, claim)
+        assert result.claim_type is ClaimType.SHIPPING
+        assert result.attribute is Attribute.FREE_SHIPPING
+        assert result.operator is Operator.IS_TRUE
+        assert result.value is True
+        assert result.parse_confidence >= 0.9
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "Product X includes complimentary delivery.",
+            "Delivery for Product X won't add anything to the bill.",
+        ],
+    )
+    async def test_free_shipping_paraphrases_preserve_positive_polarity(
+        self, normalizer, claim: str
+    ) -> None:
+        result = await parse(normalizer, claim)
+        assert result.claim_type is ClaimType.SHIPPING
+        assert result.attribute is Attribute.FREE_SHIPPING
+        assert result.operator is Operator.IS_TRUE
+        assert result.value is True
+        assert result.parse_confidence >= 0.9
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "A shipping charge applies to Product X.",
+            "Delivery for Product X adds a charge to the bill.",
+        ],
+    )
+    async def test_paid_shipping_phrases_assert_shipping_is_not_free(
+        self, normalizer, claim: str
+    ) -> None:
+        result = await parse(normalizer, claim)
+        assert result.claim_type is ClaimType.SHIPPING
+        assert result.attribute is Attribute.FREE_SHIPPING
+        assert result.operator is Operator.IS_FALSE
+        assert result.value is False
+        assert result.parse_confidence >= 0.9
 
     async def test_boolean_value_is_not_coerced_to_a_number(self, normalizer) -> None:
         # Guards the union ordering on NormalizedClaim.value: a stray Decimal
@@ -153,6 +208,11 @@ class TestShippingClaims:
         result = await parse(normalizer, "Shipping costs $9.99.")
         assert result.attribute is Attribute.SHIPPING_COST
         assert result.value == Decimal("9.99")
+
+    async def test_delivery_service_is_not_coerced_to_free_shipping(self, normalizer) -> None:
+        result = await parse(normalizer, "Product X includes weekend delivery.")
+        assert result.claim_type is ClaimType.UNKNOWN
+        assert result.attribute is Attribute.UNKNOWN
 
     async def test_free_shipping_over_a_threshold_stays_a_shipping_claim(self, normalizer) -> None:
         # Money is present, but the assertion is about shipping.
@@ -255,6 +315,13 @@ class TestRegionClaims:
         assert result.operator is Operator.INCLUDES
         assert result.value == "US"
 
+    async def test_applies_to_region_is_an_eligibility_claim(self, normalizer) -> None:
+        result = await parse(normalizer, "Product X applies to the BR region.")
+        assert result.claim_type is ClaimType.GEO_ELIGIBILITY
+        assert result.attribute is Attribute.ELIGIBLE_REGIONS
+        assert result.operator is Operator.INCLUDES
+        assert result.value == "BR"
+
     async def test_negated_region_claim(self, normalizer) -> None:
         result = await parse(normalizer, "The offer is not available in Canada.")
         assert result.operator is Operator.EXCLUDES
@@ -348,6 +415,26 @@ class TestUnclassifiedClaims:
         result = await parse(normalizer, "It isn't true that the plan lacks SSO.")
         assert result.parse_confidence <= 0.35
         assert "double_negation" in result.notes
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "Best offer ever for Northwind Pro!",
+            "Buy Northwind Pro today!",
+            "Great value from Northwind Pro.",
+        ],
+    )
+    async def test_non_verifiable_commercial_slogans_are_marked(
+        self, normalizer, claim: str
+    ) -> None:
+        result = await parse(normalizer, claim)
+        assert result.is_parsed is False
+        assert "non_verifiable_commercial_proposition" in result.notes
+
+    async def test_imperative_with_a_factual_price_is_not_marked_invalid(self, normalizer) -> None:
+        result = await parse(normalizer, "Buy Northwind Pro today for $20.")
+        assert result.is_parsed is True
+        assert "non_verifiable_commercial_proposition" not in result.notes
 
 
 class TestBaselineProfile:

@@ -307,7 +307,10 @@ class AvailabilityRule:
         claimed = str(claim.value)
         reference = str(evidence.value_of(Attribute.INVENTORY_STATUS))
 
-        if claimed in _IN_STOCK_EQUIVALENTS:
+        # "Available" is the broad assertion and is satisfied by either full
+        # or limited stock.  An explicit "limited stock" assertion is more
+        # specific and must match exactly; equivalence is directional.
+        if claimed == InventoryStatus.IN_STOCK.value:
             matched = reference in _IN_STOCK_EQUIVALENTS
         else:
             matched = reference == claimed

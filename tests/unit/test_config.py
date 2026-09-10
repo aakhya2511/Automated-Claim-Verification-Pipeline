@@ -142,3 +142,12 @@ class TestPipelineConfigInvariants:
     def test_config_is_immutable(self, optimized_config: PipelineConfig) -> None:
         with pytest.raises(ValueError):
             optimized_config.rules.enabled = False  # type: ignore[misc]
+
+    def test_rule_allow_list_rejects_duplicates(self) -> None:
+        with pytest.raises(ValueError, match="duplicates"):
+            PipelineConfig.model_validate(
+                {
+                    "name": "duplicate-rules",
+                    "rules": {"enabled_rule_ids": ["numeric_comparison", "numeric_comparison"]},
+                }
+            )

@@ -200,7 +200,9 @@ def build_baseline_snapshot(
     source_pipeline = load_pipeline_config(pipeline_path)
     if pipeline != source_pipeline or pipeline.name != "baseline":
         raise BaselineFreezeError("resolved baseline profile does not match configs/baseline.yaml")
-    pipeline_value = pipeline.model_dump(mode="json")
+    # Excluding unset optional capabilities keeps historical snapshots
+    # verifiable when later phases add opt-in configuration fields.
+    pipeline_value = pipeline.model_dump(mode="json", exclude_none=True)
     commit, status, clean = git_identity(root)
     snapshot: dict[str, Any] = {
         "baseline_version": BASELINE_VERSION,

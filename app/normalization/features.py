@@ -132,9 +132,13 @@ class FeatureResolver:
         cannot be answered with ``16_gb_ram``, and a specific phrase always
         beats a bag-of-tokens match.
         """
-        folded = textutil.fold(text)
-        squashed = textutil.squash(text)
-        claim_tokens = frozenset(textutil.tokenize(text, drop_stopwords=False))
+        ordered_claim_tokens = tuple(textutil.tokenize(text, drop_stopwords=False))
+        claim_tokens = frozenset(ordered_claim_tokens)
+        compact_ngrams = {
+            "".join(ordered_claim_tokens[start:end])
+            for start in range(len(ordered_claim_tokens))
+            for end in range(start + 1, len(ordered_claim_tokens) + 1)
+        }
 
         best: dict[str, FeatureMatch] = {}
 
@@ -144,15 +148,15 @@ class FeatureResolver:
                 best[key] = FeatureMatch(key=key, confidence=confidence, matched_via=via)
 
         for phrase, key in self._phrases.items():
-            if phrase and phrase in folded:
+            if phrase and _contains_token_sequence(ordered_claim_tokens, phrase):
                 offer(key, _CONTAINMENT_SCORE, "canonical_phrase")
 
         for phrase, key in self._synonym_phrases.items():
-            if phrase and phrase in folded:
+            if phrase and _contains_token_sequence(ordered_claim_tokens, phrase):
                 offer(key, _SYNONYM_SCORE, "synonym")
 
         for compact, key in self._squashed.items():
-            if compact and compact in squashed:
+            if compact and compact in compact_ngrams:
                 offer(key, _SQUASHED_SCORE, "compact")
 
         for key, tokens in self._tokens.items():
@@ -166,6 +170,15 @@ class FeatureResolver:
             best.values(),
             key=lambda match: (-match.confidence, -len(match.key), match.key),
         )
+
+
+def _contains_token_sequence(claim_tokens: tuple[str, ...], phrase: str) -> bool:
+    phrase_tokens = tuple(textutil.tokenize(phrase, drop_stopwords=False))
+    width = len(phrase_tokens)
+    return bool(width) and any(
+        claim_tokens[index : index + width] == phrase_tokens
+        for index in range(len(claim_tokens) - width + 1)
+    )
 
 
 def vocabulary_from_records(records: Iterable[ReferenceRecord]) -> set[str]:

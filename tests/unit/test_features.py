@@ -90,6 +90,9 @@ class TestSpecificity:
     def test_unrelated_text_resolves_to_nothing(self, resolver: FeatureResolver) -> None:
         assert resolver.resolve("AirPods Pro are $199 today.") is None
 
+    def test_short_alias_does_not_match_inside_brand_name(self, resolver: FeatureResolver) -> None:
+        assert resolver.resolve("Volterra Tempo Pro includes a 4-year warranty.") is None
+
     def test_resolve_all_ranks_best_first(self, resolver: FeatureResolver) -> None:
         matches = resolver.resolve_all("Includes SSO and audit logs.")
         assert {match.key for match in matches} == {"sso", "audit_logs"}

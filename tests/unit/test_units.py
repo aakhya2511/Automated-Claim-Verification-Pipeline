@@ -17,8 +17,11 @@ class TestParseMoney:
         [
             ("$199.99", Decimal("199.99"), "USD"),
             ("$199", Decimal("199"), "USD"),
+            ("$1634.99", Decimal("1634.99"), "USD"),
+            ("$6649.50", Decimal("6649.50"), "USD"),
             ("costs $1,299.99 today", Decimal("1299.99"), "USD"),
             ("199.99 USD", Decimal("199.99"), "USD"),
+            ("1634.99 USD", Decimal("1634.99"), "USD"),
             ("USD 199.99", Decimal("199.99"), "USD"),
             ("199 dollars", Decimal("199"), "USD"),
             ("£99.50", Decimal("99.50"), "GBP"),

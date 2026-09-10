@@ -1,0 +1,111 @@
+{
+  "candidate": "phase7_candidate_06c",
+  "catalog_fingerprint": "dab11bd68087b4771b85ac301aeea601fd539c456cc371140f60d7247c197def",
+  "config_file_sha256": "7f5e368c3dcb56c89170c08649afe3fad3868dc3cb42cac55a6aea22a94150f3",
+  "config_hash": "1ddfa3d1b7cdf2761e6f3035575234a8dc80f37750d059a0e5beb7b2eec436a2",
+  "config_path": "configs/phase7/candidate_06c.yaml",
+  "dataset_sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
+  "effective_config_sha256": "e1108dc54e87e50950fcb27cf6a50d9308195b6ed3888500640318de895648a4",
+  "evaluation_concurrency": 1,
+  "intervention": "strict_claim_scoped_evidence_and_support_without_evidence_guard",
+  "model": "qwen2.5:7b",
+  "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+  "ollama_version": "0.33.3",
+  "parent_candidate": "phase7_candidate_05b",
+  "pipeline_config": {
+    "cache": {
+      "enabled": false,
+      "max_entries": 10000,
+      "ttl_seconds": 300
+    },
+    "decision": {
+      "abstain_below": 0.0,
+      "conflict_policy": "rater_wins",
+      "contradiction_threshold": 0.0,
+      "heuristics": {
+        "block_support_without_evidence": true,
+        "demote_contradiction_on_missing_field": false,
+        "enforce_offer_window": false,
+        "require_numeric_agreement": false,
+        "respect_qualifiers": false
+      },
+      "rater_confidence_scale": 1.0,
+      "support_threshold": 0.0
+    },
+    "description": "Candidate 5b plus strict claim-scoped evidence and narrow support-without-evidence guard.",
+    "experiment_id": "phase7-candidate-06c",
+    "name": "phase7_candidate_06c",
+    "normalization": {
+      "alias_resolution": false,
+      "currency_normalization": true,
+      "deterministic_parsing": true,
+      "llm_extraction_below_confidence": 0.8,
+      "llm_extraction_fallback": false,
+      "max_claim_chars": 1000,
+      "min_claim_chars": 3,
+      "negation_detection": true,
+      "qualifier_detection": true
+    },
+    "pipeline_version": "1.0.0",
+    "rater": {
+      "always_invoke": false,
+      "enabled": true,
+      "invoke_on_missing_evidence": false,
+      "invoke_on_unresolved_entity": false,
+      "max_concurrency": 1,
+      "max_output_tokens": 256,
+      "prompt_version": "v1",
+      "schema_version": "1.0",
+      "temperature": 0.0
+    },
+    "retrieval": {
+      "evidence_projection": "claim_scoped",
+      "include_terms_text": true,
+      "max_candidates": 1,
+      "min_match_score": 0.0,
+      "strategy": "id_only"
+    },
+    "rules": {
+      "allow_terminal_contradicted": true,
+      "allow_terminal_supported": true,
+      "approximate_relative_tolerance": 0.05,
+      "date_grace_days": 0,
+      "enabled": true,
+      "enabled_rule_ids": [
+        "entity_resolution",
+        "field_presence",
+        "currency_match",
+        "numeric_comparison",
+        "free_shipping",
+        "feature_membership",
+        "availability",
+        "region_eligibility",
+        "promotion_window"
+      ],
+      "invalid_claim_gate": true,
+      "min_terminal_confidence": 0.9,
+      "percent_absolute_tolerance": 0.01,
+      "price_absolute_tolerance": 0.01,
+      "price_relative_tolerance": 0.0,
+      "trial_days_tolerance": 0
+    }
+  },
+  "provider": "ollama",
+  "provider_concurrency": 1,
+  "provider_timeout_seconds": 60.0,
+  "rater_prompt_sha256": "2cf1068ba424f99a42f3e8defe640c2cf847d5a284f5dd8a39a912b50371c6b4",
+  "rater_prompt_version": "v1",
+  "reuse_policy": {
+    "affected_claim_types": [],
+    "rerun_parent_llm_only": false
+  },
+  "schema_version": "1.0",
+  "service_batch_concurrency": 1,
+  "source_revision": {
+    "git_commit": "063e64782ba28bb71ef7838d0070acb38e28edda",
+    "source_tree_sha256": "490b04b2cab7a2e8bbcd503de8b06477bd810a2317b86913c5d8e0854aa11478",
+    "working_tree_status": "M app/bootstrap.py\n M app/core/pipeline_config.py\n M app/evaluation/baseline.py\n M app/evaluation/runner.py\n M app/normalization/claim_parser.py\n M app/normalization/features.py\n M app/normalization/regions.py\n M app/normalization/units.py\n M app/retrieval/evidence.py\n M app/rules/engine.py\n M app/rules/library.py\n M app/verification/decision.py\n M app/verification/escalation.py\n M experiments/baseline/v1/config.json\n M experiments/baseline/v1/metadata.json\n M tests/unit/test_claim_parser.py\n M tests/unit/test_config.py\n M tests/unit/test_evidence.py\n M tests/unit/test_features.py\n M tests/unit/test_rule_engine.py\n M tests/unit/test_units.py\n M tests/unit/test_verification_service.py\n?? app/evaluation/phase7.py\n?? app/evaluation/run_phase7.py\n?? configs/phase7/\n?? experiments/phase7/"
+  },
+  "temperature": 0.0,
+  "verification_timeout_seconds": 75.0
+}

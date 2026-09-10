@@ -8,6 +8,7 @@ from datetime import date
 import pytest
 from app.core.exceptions import VerificationTimeoutError
 from app.core.metrics import PrometheusMetrics
+from app.core.pipeline_config import DecisionConfig, PostRaterHeuristics, RaterConfig
 from app.domain.enums import (
     Attribute,
     ClaimType,
@@ -26,6 +27,7 @@ from app.domain.models import (
     VerificationRequest,
 )
 from app.raters.fake import FakeClaimExtractor
+from app.verification.decision import ConservativeDecisionEngine
 from app.verification.escalation import ConservativeEscalationPolicy
 
 from tests.conftest import build_test_service
@@ -284,3 +286,45 @@ def test_unknown_semantics_with_evidence_have_typed_escalation_reason(
     )
     assert decision.required is True
     assert decision.reason is EscalationReason.UNSUPPORTED_DETERMINISTIC_CLAIM_TYPE
+
+
+def test_missing_evidence_routing_flag_is_wired() -> None:
+    claim = NormalizedClaim(
+        raw_text="The plan costs $10.",
+        claim_type=ClaimType.PRICE,
+        attribute=Attribute.PRICE,
+        value=10,
+    )
+    rules = RuleEngineResult(
+        verdict=Verdict.INSUFFICIENT_EVIDENCE,
+        reason_codes=(ReasonCode.FIELD_NOT_IN_REFERENCE,),
+        escalate_to_rater=True,
+    )
+    evidence = ReferenceEvidence(
+        record_id="plan-x",
+        fields={"price__absent": True},
+        effective_attribute=Attribute.PRICE,
+    )
+    disabled = ConservativeEscalationPolicy(
+        RaterConfig(invoke_on_missing_evidence=False)
+    ).should_rate(claim, rules, evidence)
+    enabled = ConservativeEscalationPolicy(
+        RaterConfig(invoke_on_missing_evidence=True)
+    ).should_rate(claim, rules, evidence)
+    assert disabled.required is False
+    assert enabled.required is True
+
+
+def test_support_without_capable_evidence_guard_is_wired() -> None:
+    claim = NormalizedClaim(raw_text="The plan includes concierge setup.")
+    evidence = ReferenceEvidence(record_id="plan-x", fields={"price": 10})
+    rules = RuleEngineResult()
+    rater = RaterResult(verdict=Verdict.SUPPORTED, confidence=1.0)
+    guarded = ConservativeDecisionEngine(
+        DecisionConfig(heuristics=PostRaterHeuristics(block_support_without_evidence=True))
+    ).decide(claim, evidence, rules, rater)
+    unguarded = ConservativeDecisionEngine(
+        DecisionConfig(heuristics=PostRaterHeuristics(block_support_without_evidence=False))
+    ).decide(claim, evidence, rules, rater)
+    assert guarded.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert unguarded.verdict is Verdict.SUPPORTED

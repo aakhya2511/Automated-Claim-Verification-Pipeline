@@ -186,6 +186,24 @@ class TestExpiredPromotions:
         assert "active_offer_window" not in rule_ids
         assert result.verdict is Verdict.SUPPORTED
 
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "Offer SAVE20 ends June 30, 2026.",
+            "Offer SAVE20 is valid through June 30, 2026.",
+        ],
+    )
+    async def test_exact_end_date_remains_supported_after_offer_ended(
+        self, pipeline, claim: str
+    ) -> None:
+        _, _, result = await pipeline.run(
+            claim,
+            reference_id="offer-expired-1",
+            as_of=date(2026, 7, 15),
+        )
+        assert result.verdict is Verdict.SUPPORTED
+        assert ReasonCode.DATE_MISMATCH not in result.reason_codes
+
     async def test_wrong_end_date_is_a_date_mismatch(self, pipeline) -> None:
         _, _, result = await pipeline.run(
             "Offer SAVE20 is valid through July 31.", reference_id="offer-expired-1"
@@ -370,6 +388,12 @@ class TestAvailabilityRules:
         )
         assert result.verdict is Verdict.SUPPORTED
 
+    async def test_in_stock_does_not_satisfy_explicit_limited_stock_claim(self, pipeline) -> None:
+        _, _, result = await pipeline.run(
+            "The headphones have limited stock.", reference_id="prod-headphones-1"
+        )
+        assert result.verdict is Verdict.CONTRADICTED
+
     async def test_out_of_stock_claim_contradicted(self, pipeline) -> None:
         _, _, result = await pipeline.run(
             "The Noise Cancelling Headphones are out of stock.",
@@ -472,6 +496,44 @@ class TestDisabledEngine:
         assert result.verdict is None
         assert result.escalate_to_rater is True
         assert result.outcomes == ()
+
+
+class TestPhase7RuleSelection:
+    async def test_allow_list_runs_only_named_comparison_rules(self, repository) -> None:
+        selected = Pipeline(
+            repository,
+            RuleConfig(
+                enabled_rule_ids=(
+                    "entity_resolution",
+                    "field_presence",
+                    "numeric_comparison",
+                )
+            ),
+        )
+        _, _, numeric = await selected.run(
+            "The Noise Cancelling Headphones are $149.", reference_id="prod-headphones-1"
+        )
+        _, _, feature = await selected.run(
+            "This laptop includes a discrete GPU.", reference_id="prod-laptop-1"
+        )
+        assert numeric.verdict is Verdict.CONTRADICTED
+        assert feature.verdict is None
+        assert feature.escalate_to_rater is True
+
+    async def test_validity_gate_rejects_only_marked_non_propositions(self, repository) -> None:
+        gated = Pipeline(repository, RuleConfig(invalid_claim_gate=True))
+        claim, _, result = await gated.run(
+            "Best offer ever for the Noise Cancelling Headphones!",
+            reference_id="prod-headphones-1",
+        )
+        assert claim.is_parsed is False
+        assert result.verdict is Verdict.INVALID_CLAIM
+        assert result.is_terminal is True
+        assert result.decisive_rule_id == "invalid_claim_gate"
+
+    def test_unknown_rule_id_fails_fast(self, repository) -> None:
+        with pytest.raises(ValueError, match="unknown enabled_rule_ids"):
+            Pipeline(repository, RuleConfig(enabled_rule_ids=("not_a_rule",)))
 
 
 class TestAuditability:

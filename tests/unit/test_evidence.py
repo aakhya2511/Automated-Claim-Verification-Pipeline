@@ -188,6 +188,14 @@ class TestFieldProjection:
         assert evidence.fields.get("trial_days__absent") is True
         assert evidence.has(Attribute.TRIAL_DAYS) is False
 
+    async def test_unknown_claim_projects_no_unrelated_answering_fields(self, retriever) -> None:
+        evidence = await retriever.retrieve(
+            claim(claim_type=ClaimType.UNKNOWN, attribute=Attribute.UNKNOWN),
+            VerificationRequest(claim="unclassified assertion", reference_id="prod-headphones-1"),
+        )
+        assert evidence.record_id == "prod-headphones-1"
+        assert evidence.fields == {}
+
 
 class TestAttributeFallback:
     async def test_price_claim_about_a_plan_redirects_to_subscription_price(

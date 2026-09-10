@@ -1,0 +1,28 @@
+name: phase7_candidate_06
+description: Candidate 5b plus claim-scoped evidence and narrow support-without-evidence guard.
+experiment_id: phase7-candidate-06
+
+normalization: {deterministic_parsing: true, llm_extraction_fallback: false, llm_extraction_below_confidence: 0.8, alias_resolution: false, negation_detection: true, qualifier_detection: true, currency_normalization: true, max_claim_chars: 1000, min_claim_chars: 3}
+retrieval: {strategy: id_only, max_candidates: 1, min_match_score: 0.0, evidence_projection: claim_scoped, include_terms_text: true}
+rules:
+  enabled: true
+  enabled_rule_ids: [entity_resolution, field_presence, currency_match, numeric_comparison, free_shipping, feature_membership, availability, region_eligibility, promotion_window]
+  invalid_claim_gate: true
+  price_absolute_tolerance: 0.01
+  price_relative_tolerance: 0.0
+  percent_absolute_tolerance: 0.01
+  approximate_relative_tolerance: 0.05
+  trial_days_tolerance: 0
+  date_grace_days: 0
+  allow_terminal_supported: true
+  allow_terminal_contradicted: true
+  min_terminal_confidence: 0.9
+rater: {enabled: true, prompt_version: v1, schema_version: "1.0", temperature: 0.0, max_output_tokens: 256, always_invoke: false, invoke_on_missing_evidence: false, invoke_on_unresolved_entity: false, max_concurrency: 1}
+decision:
+  contradiction_threshold: 0.0
+  support_threshold: 0.0
+  abstain_below: 0.0
+  conflict_policy: rater_wins
+  rater_confidence_scale: 1.0
+  heuristics: {demote_contradiction_on_missing_field: false, respect_qualifiers: false, require_numeric_agreement: false, block_support_without_evidence: true, enforce_offer_window: false}
+cache: {enabled: false, ttl_seconds: 300, max_entries: 10000}

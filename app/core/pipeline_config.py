@@ -71,6 +71,13 @@ class RuleConfig(_Section):
     """Tolerances and permissions for the deterministic layer."""
 
     enabled: bool = True
+    #: Optional experiment-safe allow-list. ``None`` preserves the complete
+    #: production rule library; Phase 7 candidates use an explicit list to
+    #: measure cumulative rule families without evaluation-only code paths.
+    enabled_rule_ids: tuple[str, ...] | None = None
+    #: Conservative gate for recognizable non-propositional advertising copy.
+    #: Kept opt-in so historical profiles retain their exact behavior.
+    invalid_claim_gate: bool | None = None
 
     #: Absolute (currency units) and relative tolerance for money comparisons.
     #: Both must be exceeded for a mismatch, which absorbs rounding noise such
@@ -91,6 +98,14 @@ class RuleConfig(_Section):
     allow_terminal_contradicted: bool = True
     #: Rules below this confidence escalate instead of deciding.
     min_terminal_confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _check_rule_ids(self) -> Self:
+        if self.enabled_rule_ids is not None and len(set(self.enabled_rule_ids)) != len(
+            self.enabled_rule_ids
+        ):
+            raise ValueError("enabled_rule_ids must not contain duplicates")
+        return self
 
 
 class RaterConfig(_Section):

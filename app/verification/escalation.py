@@ -32,6 +32,12 @@ class ConservativeEscalationPolicy:
             return EscalationDecision(required=False, detail="deterministic result is terminal")
 
         if evidence.record_id is None:
+            if self._config.enabled and self._config.invoke_on_unresolved_entity:
+                return EscalationDecision(
+                    required=True,
+                    reason=EscalationReason.INSUFFICIENT_DETERMINISTIC_COVERAGE,
+                    detail="semantic rating explicitly enabled for an unresolved entity",
+                )
             return EscalationDecision(
                 required=False,
                 detail="no authoritative reference record is available",
@@ -40,6 +46,12 @@ class ConservativeEscalationPolicy:
         if set(rules.reason_codes).intersection(_MISSING_EVIDENCE_CODES) or any(
             key.endswith("__absent") for key in evidence.fields
         ):
+            if self._config.enabled and self._config.invoke_on_missing_evidence:
+                return EscalationDecision(
+                    required=True,
+                    reason=EscalationReason.INSUFFICIENT_DETERMINISTIC_COVERAGE,
+                    detail="semantic rating explicitly enabled for missing structured evidence",
+                )
             return EscalationDecision(
                 required=False,
                 detail="the authoritative record does not provide the required field",

@@ -121,7 +121,7 @@ def build_container(
     )
     rule_engine = DeterministicRuleEngine(config=resolved_config.rules, clock=clock)
     escalation = ConservativeEscalationPolicy(resolved_config.rater)
-    decision = ConservativeDecisionEngine()
+    decision = ConservativeDecisionEngine(resolved_config.decision)
     service = HybridVerificationService(
         config=resolved_config,
         normalizer=normalizer,

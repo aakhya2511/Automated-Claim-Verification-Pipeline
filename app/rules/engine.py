@@ -53,7 +53,17 @@ class DeterministicRuleEngine:
     ) -> None:
         self._config = config
         self._clock = clock
-        self._rules = tuple(rules) if rules is not None else default_rules()
+        available = tuple(rules) if rules is not None else default_rules()
+        enabled_ids = config.enabled_rule_ids
+        if enabled_ids is None:
+            self._rules = available
+        else:
+            available_by_id = {rule.rule_id: rule for rule in available}
+            unknown = set(enabled_ids) - set(available_by_id)
+            if unknown:
+                names = ", ".join(sorted(unknown))
+                raise ValueError(f"unknown enabled_rule_ids: {names}")
+            self._rules = tuple(available_by_id[rule_id] for rule_id in enabled_ids)
 
     @property
     def rules(self) -> tuple[Rule, ...]:
@@ -75,6 +85,28 @@ class DeterministicRuleEngine:
             config=self._config,
             as_of=claim.time_context.as_of or self._clock.today(),
         )
+
+        if (
+            self._config.invalid_claim_gate is True
+            and "non_verifiable_commercial_proposition" in claim.notes
+        ):
+            outcome = RuleOutcome(
+                rule_id="invalid_claim_gate",
+                fired=True,
+                verdict=Verdict.INVALID_CLAIM,
+                reason_codes=(ReasonCode.UNSUPPORTED_INFERENCE,),
+                confidence=0.99,
+                terminal=True,
+                detail="claim contains no supported verifiable commercial proposition",
+            )
+            return RuleEngineResult(
+                verdict=Verdict.INVALID_CLAIM,
+                confidence=outcome.confidence,
+                reason_codes=outcome.reason_codes,
+                outcomes=(outcome,),
+                decisive_rule_id=outcome.rule_id,
+                escalate_to_rater=False,
+            )
 
         if not claim.is_parsed:
             # Nothing structured to compare. Not an error — a routing decision.

@@ -1,13 +1,19 @@
 {
-  "baseline_evaluation": "NOT_COMPLETE",
+  "baseline_evaluation": "COMPLETE",
+  "config_hash": "157c34f47b5f8d9924b27569d4fdf9eae080d4c6a68c918ba08dea2be992a743",
+  "dataset_sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
   "diagnostic_validation": "PASS",
+  "error_analysis_reconciliation": "PASS",
+  "execution_failures": 1,
+  "git_commit": "063e64782ba28bb71ef7838d0070acb38e28edda",
   "holdout_evaluated": false,
+  "metrics_reconciliation": "PASS",
+  "model": "qwen2.5:7b",
+  "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+  "ollama_version": "0.33.3",
   "overlap_validation": "PASS",
-  "prediction_count": 0,
-  "real_provider_configured": false,
-  "source_revision_available": false,
-  "blockers": [
-    "The workspace is not a Git repository, so no commit SHA or clean-tree status is available.",
-    "The configured provider is fake and no real-provider credential is present."
-  ]
+  "prediction_count": 400,
+  "provider": "ollama",
+  "source_tree_sha256": "9952bdfd396dd7a20a97329594679256a03ec4d77f1595a49c8f888508ef1488",
+  "successful_semantic_verdicts": 399
 }

@@ -104,7 +104,7 @@ def validate_baseline_integrity(
         raise EvaluationRunError("resolved pipeline configuration does not match frozen baseline")
     if snapshot.get("pipeline_profile_name") != frozen_pipeline.name:
         raise EvaluationRunError("baseline pipeline profile name does not match frozen baseline")
-    effective_pipeline = frozen_pipeline.model_dump(mode="json")
+    effective_pipeline = frozen_pipeline.model_dump(mode="json", exclude_none=True)
     if snapshot.get("pipeline_effective_config_sha256") != canonical_hash(effective_pipeline):
         raise EvaluationRunError("effective pipeline configuration hash does not verify")
     if snapshot.get("pipeline_config_file") != settings.pipeline_config_file:

@@ -123,7 +123,11 @@ _NUMBER_WORD_CLASS = "|".join(sorted(NUMBER_WORDS, key=len, reverse=True))
 #: decimal separator from its position rather than from a locale we don't have.
 #: Grouping requires exactly three following digits, which is what keeps
 #: "12.5%" from being read as a grouped "125".
-_NUMBER = r"\d{1,3}(?:[.,\u202f\s]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?"
+# A grouped number must contain at least one group separator.  With ``*`` the
+# first alternative could succeed after only the first three digits of an
+# ungrouped value (for example, reading ``$1634.99`` as ``$163``) before the
+# regex engine ever considered the unrestricted alternative.
+_NUMBER = r"\d{1,3}(?:[.,\u202f\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?"
 
 _MONEY_PREFIX_RE = re.compile(
     rf"(?P<symbol>{_CURRENCY_SYMBOL_CLASS})\s*(?P<amount>{_NUMBER})",

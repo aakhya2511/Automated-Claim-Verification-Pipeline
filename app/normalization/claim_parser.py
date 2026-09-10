@@ -53,6 +53,28 @@ from app.normalization.features import FeatureResolver
 # --------------------------------------------------------------------------- #
 _TRIAL_CUES = ("trial", "try it free", "free for", "trial period")
 _SHIPPING_CUES = ("shipping", "shipped", "ships", "delivery", "postage", "freight")
+_NO_SHIPPING_CHARGE_CUES = (
+    "no shipping charge",
+    "no shipping fee",
+    "no delivery charge",
+    "no delivery fee",
+    "won't add anything to the bill",
+    "will not add anything to the bill",
+    "doesn't add anything to the bill",
+    "does not add anything to the bill",
+)
+_PAID_SHIPPING_CUES = (
+    "shipping charge applies",
+    "shipping fee applies",
+    "delivery charge applies",
+    "delivery fee applies",
+    "adds a charge",
+    "adds a fee",
+    "shipping is not free",
+    "delivery is not free",
+    "does not include free delivery",
+    "does not include free shipping",
+)
 _DISCOUNT_CUES = ("off", "discount", "save", "reduced", "markdown", "sale price", "% back")
 _MIN_PURCHASE_CUES = (
     "minimum purchase",
@@ -173,9 +195,27 @@ _LEADING_DETERMINERS = re.compile(r"^(the|this|that|these|those|our|a|an|all)\s+
 
 _PRESENT_TENSE_CUES = ("today", "right now", "currently", "now", "this week", "at the moment")
 
+# Narrow advertising speech acts that contain no factual proposition the
+# verifier knows how to compare. This runs only after every factual matcher has
+# declined, so "Buy it today for $20" remains a price claim rather than being
+# rejected because it starts with an imperative.
+_NON_VERIFIABLE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"^(?:buy|discover|do not miss)\b.+(?:today|now)?[!.]*$",
+        r"^(?:premium quality with|great value from|you will love)\b.+[!.]*$",
+        r"^(?:a smarter choice|an amazing deal on|best offer ever for)\b.+[!.]*$",
+        r"^everything you want in\b.+[!.]*$",
+    )
+)
+
 #: Below this length an extracted entity name is noise, and feeding it to
 #: lexical retrieval would drag the match toward an arbitrary record.
 _MIN_ENTITY_NAME_CHARS = 3
+
+
+def _is_non_verifiable(text: str) -> bool:
+    return any(pattern.match(text) for pattern in _NON_VERIFIABLE_PATTERNS)
 
 
 @dataclass(slots=True)
@@ -245,6 +285,8 @@ class DeterministicClaimNormalizer:
         parse = self._classify(cleaned, negated=negation_match.negated, as_of=as_of)
 
         notes = [*parse.notes]
+        if parse.claim_type is ClaimType.UNKNOWN and _is_non_verifiable(cleaned):
+            notes.append("non_verifiable_commercial_proposition")
         if negation_match.cue:
             notes.append(f"negation_cue:{negation_match.cue}")
         if negation_match.double:
@@ -389,10 +431,12 @@ class DeterministicClaimNormalizer:
         negated: bool,
         _as_of: date,
     ) -> _Parse | None:
-        if not any(cue in folded for cue in _TRIAL_CUES):
+        days = units.parse_duration_days(text)
+        explicit_trial_cue = any(cue in folded for cue in _TRIAL_CUES if cue != "free for")
+        duration_free_cue = "free for" in folded and days is not None
+        if not explicit_trial_cue and not duration_free_cue:
             return None
 
-        days = units.parse_duration_days(text)
         if days is not None:
             return _Parse(
                 claim_type=ClaimType.TRIAL_DURATION,
@@ -436,7 +480,21 @@ class DeterministicClaimNormalizer:
         if not any(cue in folded for cue in _SHIPPING_CUES):
             return None
 
-        if "free" in folded or "no shipping cost" in folded or "shipping included" in folded:
+        if "no shipping cost" in folded or any(cue in folded for cue in _NO_SHIPPING_CHARGE_CUES):
+            return _Parse(
+                claim_type=ClaimType.SHIPPING,
+                attribute=Attribute.FREE_SHIPPING,
+                operator=Operator.IS_TRUE,
+                value=True,
+                confidence=0.95,
+                notes=["no_cost_shipping_assertion"],
+            )
+        if (
+            "free" in folded
+            or "shipping included" in folded
+            or "complimentary shipping" in folded
+            or "complimentary delivery" in folded
+        ):
             return _Parse(
                 claim_type=ClaimType.SHIPPING,
                 attribute=Attribute.FREE_SHIPPING,
@@ -444,6 +502,15 @@ class DeterministicClaimNormalizer:
                 value=not negated,
                 confidence=0.95,
                 notes=["free_shipping_assertion"],
+            )
+        if any(cue in folded for cue in _PAID_SHIPPING_CUES):
+            return _Parse(
+                claim_type=ClaimType.SHIPPING,
+                attribute=Attribute.FREE_SHIPPING,
+                operator=Operator.IS_FALSE,
+                value=False,
+                confidence=0.95,
+                notes=["paid_shipping_assertion"],
             )
         if money is not None:
             return _Parse(
@@ -454,11 +521,13 @@ class DeterministicClaimNormalizer:
                 confidence=0.9,
                 notes=["shipping_cost_parsed"],
             )
-        # Mentions shipping but asserts no checkable value.
+        # A delivery-related service (for example, "weekend delivery") is not
+        # an assertion that shipping is free.  Keep the proposition untyped so
+        # unrelated free_shipping evidence cannot be treated as capable proof.
         return _Parse(
-            claim_type=ClaimType.SHIPPING,
-            attribute=Attribute.FREE_SHIPPING,
-            confidence=0.4,
+            claim_type=ClaimType.UNKNOWN,
+            attribute=Attribute.UNKNOWN,
+            confidence=0.0,
             notes=["shipping_without_value"],
         )
 

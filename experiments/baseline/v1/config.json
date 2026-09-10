@@ -1,51 +1,73 @@
 {
   "baseline_version": "v1",
   "catalog_fingerprint": "dab11bd68087b4771b85ac301aeea601fd539c456cc371140f60d7247c197def",
-  "config_hash": "564683822d1ab916bf95fa3702b25d0f3363fefce5fa8925b510d5400bfd7ad4",
+  "config_hash": "157c34f47b5f8d9924b27569d4fdf9eae080d4c6a68c918ba08dea2be992a743",
+  "diagnostic_dataset_sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
   "extraction_prompt_sha256": "560b48153dc8a5f96043f7c6ac0787ce13771bca732c80d13614782166cfc289",
   "extraction_prompt_version": "v1",
-  "git_commit": null,
-  "model": "gpt-4o-mini",
+  "git_commit": "063e64782ba28bb71ef7838d0070acb38e28edda",
+  "model": "qwen2.5:7b",
+  "operational_config": {
+    "evaluation": {
+      "concurrency": 1
+    },
+    "provider": {
+      "connect_timeout_seconds": 2.0,
+      "max_concurrency": 1,
+      "max_connections": 32,
+      "max_keepalive_connections": 16,
+      "max_output_tokens": 256,
+      "max_retries": 2,
+      "retry_base_delay_seconds": 0.25,
+      "schema_version": "1.0",
+      "total_timeout_seconds": 60.0
+    },
+    "verification": {
+      "batch_concurrency": 1,
+      "max_batch_items": 100,
+      "timeout_seconds": 75.0
+    }
+  },
   "pipeline_config": {
     "cache": {
-      "enabled": true,
+      "enabled": false,
       "max_entries": 10000,
       "ttl_seconds": 300
     },
     "decision": {
-      "abstain_below": 0.5,
-      "conflict_policy": "rules_win",
-      "contradiction_threshold": 0.7,
+      "abstain_below": 0.0,
+      "conflict_policy": "rater_wins",
+      "contradiction_threshold": 0.0,
       "heuristics": {
-        "block_support_without_evidence": true,
-        "demote_contradiction_on_missing_field": true,
-        "enforce_offer_window": true,
-        "require_numeric_agreement": true,
-        "respect_qualifiers": true
+        "block_support_without_evidence": false,
+        "demote_contradiction_on_missing_field": false,
+        "enforce_offer_window": false,
+        "require_numeric_agreement": false,
+        "respect_qualifiers": false
       },
-      "rater_confidence_scale": 0.95,
-      "support_threshold": 0.6
+      "rater_confidence_scale": 1.0,
+      "support_threshold": 0.0
     },
-    "description": "Deterministic normalization and rules first, LLM rater only for ambiguous claims.",
-    "experiment_id": "exp-optimized-v1",
-    "name": "optimized",
+    "description": "Single-shot LLM rater over the full reference record, no deterministic layer.",
+    "experiment_id": "exp-baseline-v1",
+    "name": "baseline",
     "normalization": {
-      "alias_resolution": true,
-      "currency_normalization": true,
-      "deterministic_parsing": true,
+      "alias_resolution": false,
+      "currency_normalization": false,
+      "deterministic_parsing": false,
       "llm_extraction_below_confidence": 0.8,
-      "llm_extraction_fallback": true,
+      "llm_extraction_fallback": false,
       "max_claim_chars": 1000,
       "min_claim_chars": 3,
-      "negation_detection": true,
-      "qualifier_detection": true
+      "negation_detection": false,
+      "qualifier_detection": false
     },
     "pipeline_version": "1.0.0",
     "rater": {
-      "always_invoke": false,
+      "always_invoke": true,
       "enabled": true,
-      "invoke_on_missing_evidence": false,
-      "invoke_on_unresolved_entity": false,
+      "invoke_on_missing_evidence": true,
+      "invoke_on_unresolved_entity": true,
       "max_concurrency": 8,
       "max_output_tokens": 256,
       "prompt_version": "v1",
@@ -53,18 +75,18 @@
       "temperature": 0.0
     },
     "retrieval": {
-      "evidence_projection": "claim_scoped",
+      "evidence_projection": "full_record",
       "include_terms_text": true,
-      "max_candidates": 5,
-      "min_match_score": 0.45,
-      "strategy": "id_then_lexical"
+      "max_candidates": 1,
+      "min_match_score": 0.0,
+      "strategy": "id_only"
     },
     "rules": {
       "allow_terminal_contradicted": true,
       "allow_terminal_supported": true,
       "approximate_relative_tolerance": 0.05,
       "date_grace_days": 0,
-      "enabled": true,
+      "enabled": false,
       "min_terminal_confidence": 0.9,
       "percent_absolute_tolerance": 0.01,
       "price_absolute_tolerance": 0.01,
@@ -72,19 +94,27 @@
       "trial_days_tolerance": 0
     }
   },
-  "pipeline_config_file": "optimized.yaml",
-  "provider": "fake",
+  "pipeline_config_file": "baseline.yaml",
+  "pipeline_config_path": "configs/baseline.yaml",
+  "pipeline_config_sha256": "5cce956eed7d462d47462378a9e1f02ed2e15443e06e4ad73e2672b8741dea96",
+  "pipeline_effective_config_sha256": "2a8354f083079a80b01fed7075edba4103f9a1575ff51986c75d8457ffa3d9f5",
+  "pipeline_profile_name": "baseline",
+  "provider": "ollama",
+  "provider_base_url": "http://127.0.0.1:11434/api",
+  "provider_metadata": {
+    "configured_model": "qwen2.5:7b",
+    "endpoint": "http://127.0.0.1:11434/api",
+    "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "ollama_version": "0.33.3",
+    "provider": "ollama",
+    "resolved_model": "qwen2.5:7b",
+    "structured_output_validated": true
+  },
   "rater_prompt_sha256": "2cf1068ba424f99a42f3e8defe640c2cf847d5a284f5dd8a39a912b50371c6b4",
   "rater_prompt_version": "v1",
   "request_schema_version": "1.0",
-  "retry": {
-    "connect_timeout_seconds": 2.0,
-    "max_retries": 2,
-    "retry_base_delay_seconds": 0.25,
-    "timeout_seconds": 6.0
-  },
-  "source_tree_sha256": "b1ece94220923512a96f01faa1832fafc82d625e40a36273aa304bc19490f2be",
+  "source_tree_sha256": "9952bdfd396dd7a20a97329594679256a03ec4d77f1595a49c8f888508ef1488",
   "temperature": 0.0,
-  "working_tree_clean": null,
-  "working_tree_status": "git repository unavailable"
+  "working_tree_clean": true,
+  "working_tree_status": "clean"
 }
