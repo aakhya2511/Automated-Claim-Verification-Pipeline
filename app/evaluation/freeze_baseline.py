@@ -43,6 +43,8 @@ def main() -> int:
         "verification_timeout_seconds="
         f"{snapshot['operational_config']['verification']['timeout_seconds']}"
     )
+    print(f"evaluation_concurrency={snapshot['operational_config']['evaluation']['concurrency']}")
+    print(f"provider_concurrency={snapshot['operational_config']['provider']['max_concurrency']}")
     print(f"git_commit={snapshot['git_commit'] or 'UNAVAILABLE'}")
     print(f"working_tree_clean={snapshot['working_tree_clean']}")
     return 0

@@ -16,6 +16,8 @@ BASELINE_PIPELINE_FILE = "baseline.yaml"
 BASELINE_PIPELINE_PATH = Path("configs") / BASELINE_PIPELINE_FILE
 BASELINE_LLM_TIMEOUT_SECONDS = 60.0
 BASELINE_VERIFICATION_TIMEOUT_SECONDS = 75.0
+BASELINE_EVALUATION_CONCURRENCY = 1
+BASELINE_BATCH_CONCURRENCY = 1
 SOURCE_PATTERNS = ("*.py", "*.yaml", "*.txt", "pyproject.toml", "Makefile")
 DIAGNOSTIC_DATASET = Path("data/evaluation/dev/v1/diagnostic.jsonl")
 ALLOWED_GENERATED_FILES = frozenset(
@@ -127,10 +129,16 @@ def official_baseline_settings(settings: Settings) -> Settings:
         update={
             "pipeline_config_file": BASELINE_PIPELINE_FILE,
             "server": settings.server.model_copy(
-                update={"verification_timeout_seconds": BASELINE_VERIFICATION_TIMEOUT_SECONDS}
+                update={
+                    "verification_timeout_seconds": BASELINE_VERIFICATION_TIMEOUT_SECONDS,
+                    "batch_concurrency": BASELINE_BATCH_CONCURRENCY,
+                }
             ),
             "llm": settings.llm.model_copy(
-                update={"timeout_seconds": BASELINE_LLM_TIMEOUT_SECONDS}
+                update={
+                    "timeout_seconds": BASELINE_LLM_TIMEOUT_SECONDS,
+                    "max_concurrency": BASELINE_EVALUATION_CONCURRENCY,
+                }
             ),
         }
     )
@@ -148,6 +156,9 @@ def validate_official_timeout_hierarchy(settings: Settings) -> None:
 def operational_config(settings: Settings) -> dict[str, Any]:
     """Return every runtime limit that can affect execution, routing, or latency."""
     return {
+        "evaluation": {
+            "concurrency": BASELINE_EVALUATION_CONCURRENCY,
+        },
         "verification": {
             "timeout_seconds": settings.server.verification_timeout_seconds,
             "batch_concurrency": settings.server.batch_concurrency,

@@ -179,14 +179,17 @@ async def run_evaluation(
         completed_ids = {row.sample_id for row in checkpoint_rows}
         pending = [sample for sample in samples if sample.sample_id not in completed_ids]
         for offset in range(0, len(pending), CHECKPOINT_BATCH_SIZE):
-            batch = pending[offset : offset + CHECKPOINT_BATCH_SIZE]
-            results = await container.service.verify_batch(
-                [sample.to_verification_request() for sample in batch]
-            )
-            checkpoint_rows.extend(
-                prediction_from_result(sample, result)
-                for sample, result in zip(batch, results, strict=True)
-            )
+            checkpoint_batch = pending[offset : offset + CHECKPOINT_BATCH_SIZE]
+            evaluation_concurrency = _evaluation_concurrency(snapshot)
+            for start in range(0, len(checkpoint_batch), evaluation_concurrency):
+                batch = checkpoint_batch[start : start + evaluation_concurrency]
+                results = await container.service.verify_batch(
+                    [sample.to_verification_request() for sample in batch]
+                )
+                checkpoint_rows.extend(
+                    prediction_from_result(sample, result)
+                    for sample, result in zip(batch, results, strict=True)
+                )
             checkpoint_rows = _order_rows(checkpoint_rows, samples)
             await asyncio.to_thread(write_checkpoint, output, checkpoint_rows)
     finally:
@@ -327,3 +330,12 @@ def _model_digest(snapshot: dict[str, Any]) -> str | None:
     metadata = snapshot.get("provider_metadata")
     digest = metadata.get("model_digest") if isinstance(metadata, dict) else None
     return digest if isinstance(digest, str) else None
+
+
+def _evaluation_concurrency(snapshot: dict[str, Any]) -> int:
+    operational = snapshot.get("operational_config")
+    evaluation = operational.get("evaluation") if isinstance(operational, dict) else None
+    concurrency = evaluation.get("concurrency") if isinstance(evaluation, dict) else None
+    if not isinstance(concurrency, int) or isinstance(concurrency, bool) or concurrency < 1:
+        raise EvaluationRunError("frozen evaluation concurrency is invalid")
+    return concurrency

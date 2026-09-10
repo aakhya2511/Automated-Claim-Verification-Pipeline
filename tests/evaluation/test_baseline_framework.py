@@ -230,13 +230,13 @@ def test_checkpoint_is_atomic_ordered_unique_and_identity_bound(tmp_path: Path) 
     assert not list(tmp_path.glob(".*.tmp"))
 
 
-def test_checkpoint_rejects_changed_profile_or_timeout_identity(tmp_path: Path) -> None:
+def test_checkpoint_rejects_changed_evaluation_concurrency_identity(tmp_path: Path) -> None:
     samples = load_samples(DIAGNOSTIC)[:1]
     load_or_initialize_checkpoint(
         tmp_path,
         samples,
         dataset_sha256="dataset",
-        config_hash="baseline-profile-timeout-75",
+        config_hash="evaluation-concurrency-16",
         provider="ollama",
         model="model-a",
         model_digest="digest-a",
@@ -246,7 +246,7 @@ def test_checkpoint_rejects_changed_profile_or_timeout_identity(tmp_path: Path) 
             tmp_path,
             samples,
             dataset_sha256="dataset",
-            config_hash="different-profile-or-timeout",
+            config_hash="evaluation-concurrency-1",
             provider="ollama",
             model="model-a",
             model_digest="digest-a",

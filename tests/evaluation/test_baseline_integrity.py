@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 from app.core.config import LLMSettings, ServerSettings, Settings
 from app.evaluation.baseline import (
+    BASELINE_BATCH_CONCURRENCY,
+    BASELINE_EVALUATION_CONCURRENCY,
     BASELINE_LLM_TIMEOUT_SECONDS,
     BASELINE_VERIFICATION_TIMEOUT_SECONDS,
     canonical_hash,
@@ -144,6 +146,8 @@ def test_official_settings_bind_baseline_independently_of_application_default() 
     assert application.pipeline_config_file == "optimized.yaml"
     assert baseline.pipeline_config_file == "baseline.yaml"
     assert baseline.llm.timeout_seconds == BASELINE_LLM_TIMEOUT_SECONDS
+    assert baseline.llm.max_concurrency == BASELINE_EVALUATION_CONCURRENCY
+    assert baseline.server.batch_concurrency == BASELINE_BATCH_CONCURRENCY
     assert baseline.server.verification_timeout_seconds == BASELINE_VERIFICATION_TIMEOUT_SECONDS
 
 
@@ -182,6 +186,7 @@ def test_timeout_hierarchy_rejects_outer_deadline_below_provider_budget() -> Non
 @pytest.mark.parametrize(
     ("section", "field", "value"),
     [
+        ("evaluation", "concurrency", 16),
         ("verification", "timeout_seconds", 76.0),
         ("verification", "batch_concurrency", 7),
         ("provider", "total_timeout_seconds", 59.0),
@@ -209,6 +214,7 @@ def test_operational_snapshot_captures_all_execution_limits(
     _root, config, _diagnostic, settings = frozen_repository
     snapshot = load_snapshot(config)
     assert snapshot["operational_config"] == operational_config(settings)
+    assert snapshot["operational_config"]["evaluation"] == {"concurrency": 1}
     assert set(snapshot["operational_config"]["verification"]) == {
         "timeout_seconds",
         "batch_concurrency",
