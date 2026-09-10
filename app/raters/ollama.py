@@ -24,7 +24,7 @@ from app.core.exceptions import (
     RaterTimeoutError,
     RaterUnavailableError,
 )
-from app.domain.enums import Attribute, ClaimType
+from app.domain.enums import RATER_REASON_CODES, Attribute, ClaimType, ReasonCode, Verdict
 from app.domain.models import (
     ClaimExtraction,
     ExtractionContext,
@@ -39,7 +39,7 @@ from app.domain.models import (
 from app.raters.extractor import EXTRACTION_JSON_SCHEMA
 from app.raters.openai import _rating_input
 from app.raters.prompts import load_prompt
-from app.raters.schemas import RATING_JSON_SCHEMA, SemanticRatingPayload
+from app.raters.schemas import SemanticRatingPayload
 from app.raters.transport import ProviderResponse, Sleeper
 
 OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434/api"
@@ -47,6 +47,69 @@ HTTP_BAD_REQUEST = 400
 HTTP_NOT_FOUND = 404
 HTTP_RATE_LIMITED = 429
 HTTP_SERVER_ERROR = 500
+
+_ABSTENTION_CODES = {
+    ReasonCode.REFERENCE_NOT_FOUND,
+    ReasonCode.AMBIGUOUS_LANGUAGE,
+    ReasonCode.INSUFFICIENT_EVIDENCE,
+    ReasonCode.UNSUPPORTED_INFERENCE,
+}
+_MISMATCH_CODES = RATER_REASON_CODES - _ABSTENTION_CODES
+
+
+def _rating_branch(
+    verdict: Verdict,
+    *,
+    reason_codes: set[ReasonCode],
+    minimum_reasons: int = 0,
+    maximum_reasons: int | None = None,
+) -> dict[str, object]:
+    item_schema: dict[str, object] = {"type": "string"}
+    if reason_codes:
+        item_schema["enum"] = sorted(code.value for code in reason_codes)
+    reasons: dict[str, object] = {
+        "type": "array",
+        "items": item_schema,
+        "uniqueItems": True,
+        "minItems": minimum_reasons,
+    }
+    if maximum_reasons is not None:
+        reasons["maxItems"] = maximum_reasons
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "verdict": {"type": "string", "const": verdict.value},
+            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "reason_codes": reasons,
+            "explanation": {"type": "string", "minLength": 1, "maxLength": 600},
+        },
+        "required": ["verdict", "confidence", "reason_codes", "explanation"],
+    }
+
+
+OLLAMA_RATING_JSON_SCHEMA: dict[str, object] = {
+    "oneOf": [
+        _rating_branch(
+            Verdict.SUPPORTED,
+            reason_codes=set(),
+            maximum_reasons=0,
+        ),
+        _rating_branch(
+            Verdict.CONTRADICTED,
+            reason_codes=set(_MISMATCH_CODES),
+            minimum_reasons=1,
+        ),
+        _rating_branch(
+            Verdict.INSUFFICIENT_EVIDENCE,
+            reason_codes=set(_ABSTENTION_CODES),
+        ),
+        _rating_branch(
+            Verdict.INVALID_CLAIM,
+            reason_codes=set(RATER_REASON_CODES),
+        ),
+    ]
+}
 
 
 class OllamaIdentity(BaseModel):
@@ -240,7 +303,7 @@ class OllamaRater:
                 {"role": "system", "content": self._prompt},
                 {"role": "user", "content": _rating_input(claim, evidence, context)},
             ],
-            schema=RATING_JSON_SCHEMA,
+            schema=OLLAMA_RATING_JSON_SCHEMA,
         )
         try:
             parsed = SemanticRatingPayload.model_validate_json(provider.text)

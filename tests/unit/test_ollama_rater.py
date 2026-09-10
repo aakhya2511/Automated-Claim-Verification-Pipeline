@@ -26,12 +26,12 @@ from app.domain.models import (
 )
 from app.raters.extractor import EXTRACTION_JSON_SCHEMA
 from app.raters.ollama import (
+    OLLAMA_RATING_JSON_SCHEMA,
     OllamaClaimExtractor,
     OllamaRater,
     OllamaTransport,
     preflight_ollama,
 )
-from app.raters.schemas import RATING_JSON_SCHEMA
 
 
 def settings(*, retries: int = 0) -> LLMSettings:
@@ -91,7 +91,7 @@ async def test_successful_rating_uses_schema_and_provider_metadata() -> None:
             context=RatingContext(evaluation_date=date(2026, 9, 9), request_id="req"),
         )
 
-    assert captured["format"] == RATING_JSON_SCHEMA
+    assert captured["format"] == OLLAMA_RATING_JSON_SCHEMA
     assert captured["stream"] is False
     assert captured["options"] == {"temperature": 0.0, "num_predict": 256}
     assert result.verdict is Verdict.SUPPORTED
@@ -147,6 +147,29 @@ async def test_successful_extraction_uses_same_strict_schema() -> None:
             '{"verdict":"CONTRADICTED","confidence":0.9,"reason_codes":[],"explanation":"x"}',
             RaterSchemaValidationError,
         ),
+        (
+            '{"verdict":"SUPPORTED","confidence":0.9,'
+            '"reason_codes":["REFERENCE_NOT_FOUND"],"explanation":"x"}',
+            RaterSchemaValidationError,
+        ),
+        (
+            '{"verdict":"INSUFFICIENT_EVIDENCE","confidence":0.9,'
+            '"reason_codes":["PRICE_MISMATCH"],"explanation":"x"}',
+            RaterSchemaValidationError,
+        ),
+        (
+            '{"verdict":"CONTRADICTED","confidence":0.9,'
+            '"reason_codes":["PRICE_MISMATCH","PRICE_MISMATCH"],"explanation":"x"}',
+            RaterSchemaValidationError,
+        ),
+        (
+            '{"verdict":"UNKNOWN","confidence":0.9,"reason_codes":[],"explanation":"x"}',
+            RaterSchemaValidationError,
+        ),
+        (
+            '{"verdict":"SUPPORTED","confidence":0.9,"reason_codes":[]}',
+            RaterSchemaValidationError,
+        ),
     ],
 )
 async def test_malformed_schema_invalid_and_conflicting_rating_fail(
@@ -166,6 +189,29 @@ async def test_malformed_ollama_envelope_fails() -> None:
     async with client_for(lambda request: httpx.Response(200, content=b"not-json")) as client:
         with pytest.raises(RaterInvalidResponseError):
             await OllamaTransport(settings(), client=client).chat(messages=[], schema={})
+
+
+async def test_real_failure_regression_schema_forbids_supported_reason_codes() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        request_body = json.loads(request.content)
+        branches = request_body["format"]["oneOf"]
+        supported = next(
+            branch
+            for branch in branches
+            if branch["properties"]["verdict"].get("const") == "SUPPORTED"
+        )
+        assert supported["properties"]["reason_codes"]["maxItems"] == 0
+        return httpx.Response(200, json=chat_body(rating_json()))
+
+    async with client_for(handler) as client:
+        result = await OllamaRater(
+            settings(), transport=OllamaTransport(settings(), client=client)
+        ).rate(
+            NormalizedClaim(raw_text="This product includes free shipping."),
+            ReferenceEvidence(record_id="x", fields={"free_shipping": True}),
+            context=RatingContext(evaluation_date=date(2026, 9, 9)),
+        )
+    assert result.verdict is Verdict.SUPPORTED
 
 
 async def test_unavailable_local_server_is_typed() -> None:
