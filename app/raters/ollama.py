@@ -136,10 +136,12 @@ class OllamaTransport:
         client: httpx.AsyncClient | None = None,
         sleeper: Sleeper = asyncio.sleep,
         random_value: Callable[[], float] = random.random,
+        monotonic: Callable[[], float] = perf_counter,
     ) -> None:
         self._settings = settings
         self._sleeper = sleeper
         self._random = random_value
+        self._monotonic = monotonic
         self._semaphore = asyncio.Semaphore(settings.max_concurrency)
         self._owns_client = client is None
         self.base_url = (settings.base_url or OLLAMA_DEFAULT_BASE_URL).rstrip("/")
@@ -158,6 +160,7 @@ class OllamaTransport:
     async def chat(
         self, *, messages: list[dict[str, str]], schema: dict[str, object]
     ) -> ProviderResponse:
+        deadline = self._monotonic() + self._settings.timeout_seconds
         body = {
             "model": self._settings.model,
             "messages": messages,
@@ -169,7 +172,9 @@ class OllamaTransport:
             },
         }
         async with self._semaphore:
-            response, attempts, latency_ms = await self._request("POST", "chat", json_body=body)
+            response, attempts, latency_ms = await self._request(
+                "POST", "chat", json_body=body, deadline=deadline
+            )
         return self._parse_chat(response, attempts=attempts, latency_ms=latency_ms)
 
     async def get_json(self, path: str) -> dict[str, Any]:
@@ -183,25 +188,50 @@ class OllamaTransport:
         return payload
 
     async def _request(
-        self, method: str, path: str, *, json_body: dict[str, Any] | None = None
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        deadline: float | None = None,
     ) -> tuple[httpx.Response, int, float]:
         started = perf_counter()
+        operation_deadline = deadline or self._monotonic() + self._settings.timeout_seconds
         for attempt in range(1, self._settings.max_retries + 2):
+            remaining = operation_deadline - self._monotonic()
+            if remaining <= 0:
+                raise RaterTimeoutError("Ollama operation exceeded its total timeout budget")
+            request_timeout = httpx.Timeout(
+                remaining,
+                connect=min(self._settings.connect_timeout_seconds, remaining),
+            )
             try:
-                response = await self._client.request(method, path, json=json_body)
+                response = await self._client.request(
+                    method,
+                    path,
+                    json=json_body,
+                    timeout=request_timeout,
+                )
             except httpx.TimeoutException:
                 error: Exception = RaterTimeoutError("Ollama request timed out")
             except httpx.TransportError:
                 error = RaterUnavailableError("Ollama local server is unavailable")
             else:
-                provider_error = self._http_error(response)
+                provider_error = (
+                    RaterTimeoutError("Ollama operation exceeded its total timeout budget")
+                    if self._monotonic() >= operation_deadline
+                    else self._http_error(response)
+                )
                 if provider_error is None:
                     return response, attempt, (perf_counter() - started) * 1000
                 error = provider_error
             if not getattr(error, "retryable", False) or attempt > self._settings.max_retries:
                 raise error
             delay = self._settings.retry_base_delay_seconds * (2 ** (attempt - 1))
-            await self._sleeper(delay * (0.5 + self._random()))
+            jittered_delay = delay * (0.5 + self._random())
+            if jittered_delay >= operation_deadline - self._monotonic():
+                raise RaterTimeoutError("Ollama operation exceeded its total timeout budget")
+            await self._sleeper(jittered_delay)
         raise RaterUnavailableError("Ollama request failed after retries")
 
     @staticmethod

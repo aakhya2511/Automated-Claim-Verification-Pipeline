@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -230,6 +231,47 @@ async def test_timeout_is_typed_and_bounded() -> None:
     async with client_for(handler) as client:
         with pytest.raises(RaterTimeoutError):
             await OllamaTransport(settings(), client=client).chat(messages=[], schema={})
+
+
+async def test_retries_share_one_total_operation_budget() -> None:
+    now = 0.0
+    attempts: list[dict[str, Any]] = []
+
+    def monotonic() -> float:
+        return now
+
+    async def advance(seconds: float) -> None:
+        nonlocal now
+        now += seconds
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal now
+        attempts.append(request.extensions["timeout"])
+        now += 0.45
+        raise httpx.ReadTimeout("timeout", request=request)
+
+    budgeted = LLMSettings(
+        provider="ollama",
+        base_url="http://ollama.test/api",
+        model="qwen-test:7b",
+        timeout_seconds=1.0,
+        max_retries=2,
+        retry_base_delay_seconds=0.1,
+    )
+    async with client_for(handler) as client:
+        transport = OllamaTransport(
+            budgeted,
+            client=client,
+            sleeper=advance,
+            random_value=lambda: 0.5,
+            monotonic=monotonic,
+        )
+        with pytest.raises(RaterTimeoutError, match="total timeout budget"):
+            await transport.chat(messages=[], schema={})
+
+    assert len(attempts) == 2
+    assert attempts[0]["read"] == pytest.approx(1.0)
+    assert attempts[1]["read"] == pytest.approx(0.45)
 
 
 async def test_preflight_rejects_missing_model() -> None:

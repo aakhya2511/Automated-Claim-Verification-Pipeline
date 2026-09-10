@@ -5,8 +5,17 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from app.core.config import Settings
-from app.evaluation.baseline import write_baseline_snapshot
+from app.core.config import LLMSettings, ServerSettings, Settings
+from app.evaluation.baseline import (
+    BASELINE_LLM_TIMEOUT_SECONDS,
+    BASELINE_VERIFICATION_TIMEOUT_SECONDS,
+    canonical_hash,
+    file_hash,
+    official_baseline_settings,
+    operational_config,
+    validate_official_timeout_hierarchy,
+    write_baseline_snapshot,
+)
 from app.evaluation.runner import (
     EvaluationRunError,
     load_snapshot,
@@ -32,7 +41,7 @@ def frozen_repository(tmp_path: Path) -> tuple[Path, Path, Path, Settings]:
     _write(tmp_path / "app/verification/service.py", "BEHAVIOR = 'v1'\n")
     _write(tmp_path / "prompts/rater/v1.txt", "rate exactly\n")
     _write(tmp_path / "prompts/extractor/v1.txt", "extract exactly\n")
-    _write(tmp_path / "configs/optimized.yaml", "name: baseline\nrater:\n  prompt_version: v1\n")
+    _write(tmp_path / "configs/baseline.yaml", "name: baseline\nrater:\n  prompt_version: v1\n")
     _write(catalog, '{"id":"catalog-1"}\n')
     _write(diagnostic, '{"id":"diagnostic-1"}\n')
     _write(holdout, '{"id":"holdout-1"}\n')
@@ -46,21 +55,23 @@ def frozen_repository(tmp_path: Path) -> tuple[Path, Path, Path, Settings]:
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "clean source")
 
-    settings = Settings(
-        _env_file=None,
-        llm={
-            "provider": "ollama",
-            "model": "qwen2.5:7b",
-            "base_url": "http://127.0.0.1:11434/api",
-            "temperature": 0.0,
-        },
-        data={
-            "reference_catalog_path": catalog,
-            "evaluation_dataset_path": holdout,
-            "prompts_dir": tmp_path / "prompts",
-            "configs_dir": tmp_path / "configs",
-            "artifacts_dir": tmp_path / "artifacts",
-        },
+    settings = official_baseline_settings(
+        Settings(
+            _env_file=None,
+            llm={
+                "provider": "ollama",
+                "model": "qwen2.5:7b",
+                "base_url": "http://127.0.0.1:11434/api",
+                "temperature": 0.0,
+            },
+            data={
+                "reference_catalog_path": catalog,
+                "evaluation_dataset_path": holdout,
+                "prompts_dir": tmp_path / "prompts",
+                "configs_dir": tmp_path / "configs",
+                "artifacts_dir": tmp_path / "artifacts",
+            },
+        )
     )
     write_baseline_snapshot(
         config,
@@ -124,3 +135,93 @@ def test_post_freeze_config_tampering_fails(
     config.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(EvaluationRunError, match="configuration hash"):
         _validate(frozen_repository)
+
+
+def test_official_settings_bind_baseline_independently_of_application_default() -> None:
+    application = Settings(_env_file=None, pipeline_config_file="optimized.yaml")
+    baseline = official_baseline_settings(application)
+
+    assert application.pipeline_config_file == "optimized.yaml"
+    assert baseline.pipeline_config_file == "baseline.yaml"
+    assert baseline.llm.timeout_seconds == BASELINE_LLM_TIMEOUT_SECONDS
+    assert baseline.server.verification_timeout_seconds == BASELINE_VERIFICATION_TIMEOUT_SECONDS
+
+
+def test_frozen_profile_hash_matches_exact_baseline_yaml(
+    frozen_repository: tuple[Path, Path, Path, Settings],
+) -> None:
+    root, config, _diagnostic, _settings = frozen_repository
+    snapshot = load_snapshot(config)
+    assert snapshot["pipeline_profile_name"] == "baseline"
+    assert snapshot["pipeline_config_path"] == "configs/baseline.yaml"
+    assert snapshot["pipeline_config_sha256"] == file_hash(root / "configs/baseline.yaml")
+    assert snapshot["pipeline_effective_config_sha256"] == canonical_hash(
+        snapshot["pipeline_config"]
+    )
+
+
+def test_post_freeze_baseline_profile_change_fails(
+    frozen_repository: tuple[Path, Path, Path, Settings],
+) -> None:
+    root, _config, _diagnostic, _settings = frozen_repository
+    _write(root / "configs/baseline.yaml", "name: changed\nrater:\n  prompt_version: v1\n")
+    with pytest.raises(EvaluationRunError, match=r"configs/baseline\.yaml"):
+        _validate(frozen_repository)
+
+
+def test_timeout_hierarchy_rejects_outer_deadline_below_provider_budget() -> None:
+    settings = Settings(
+        _env_file=None,
+        server=ServerSettings(verification_timeout_seconds=59),
+        llm=LLMSettings(timeout_seconds=60),
+    )
+    with pytest.raises(RuntimeError, match="must exceed"):
+        validate_official_timeout_hierarchy(settings)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    [
+        ("verification", "timeout_seconds", 76.0),
+        ("verification", "batch_concurrency", 7),
+        ("provider", "total_timeout_seconds", 59.0),
+        ("provider", "max_concurrency", 3),
+        ("provider", "max_output_tokens", 512),
+    ],
+)
+def test_operational_changes_change_baseline_config_identity(
+    frozen_repository: tuple[Path, Path, Path, Settings],
+    section: str,
+    field: str,
+    value: float | int,
+) -> None:
+    _root, config, _diagnostic, _settings = frozen_repository
+    snapshot = load_snapshot(config)
+    changed = json.loads(json.dumps(snapshot))
+    changed.pop("config_hash")
+    changed["operational_config"][section][field] = value
+    assert canonical_hash(changed) != snapshot["config_hash"]
+
+
+def test_operational_snapshot_captures_all_execution_limits(
+    frozen_repository: tuple[Path, Path, Path, Settings],
+) -> None:
+    _root, config, _diagnostic, settings = frozen_repository
+    snapshot = load_snapshot(config)
+    assert snapshot["operational_config"] == operational_config(settings)
+    assert set(snapshot["operational_config"]["verification"]) == {
+        "timeout_seconds",
+        "batch_concurrency",
+        "max_batch_items",
+    }
+    assert set(snapshot["operational_config"]["provider"]) == {
+        "total_timeout_seconds",
+        "connect_timeout_seconds",
+        "max_retries",
+        "retry_base_delay_seconds",
+        "max_concurrency",
+        "max_connections",
+        "max_keepalive_connections",
+        "max_output_tokens",
+        "schema_version",
+    }

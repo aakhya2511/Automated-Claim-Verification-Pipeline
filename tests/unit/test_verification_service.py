@@ -78,6 +78,18 @@ class HangingRater(ConcurrencyRater):
         raise AssertionError("unreachable")
 
 
+class DelayedRater(ConcurrencyRater):
+    async def rate(
+        self,
+        claim: NormalizedClaim,
+        evidence: ReferenceEvidence,
+        *,
+        context: RatingContext,
+    ) -> RaterResult:
+        await asyncio.sleep(0.02)
+        return await super().rate(claim, evidence, context=context)
+
+
 def ambiguous_requests(count: int) -> list[VerificationRequest]:
     return [
         VerificationRequest(
@@ -121,6 +133,21 @@ async def test_overall_deadline_cancels_hanging_rater(
     )
     with pytest.raises(VerificationTimeoutError):
         await service.verify(ambiguous_requests(1)[0])
+
+
+async def test_semantic_rater_can_exceed_old_deadline_but_finish_with_new_deadline(
+    settings, baseline_config, repository, fixed_clock
+) -> None:
+    service = build_test_service(
+        settings=settings,
+        config=baseline_config,
+        repository=repository,
+        clock=fixed_clock,
+        rater=DelayedRater(),
+        timeout_seconds=0.075,
+    )
+    result = await service.verify(ambiguous_requests(1)[0])
+    assert result.verification_path is VerificationPath.LLM_RATER
 
 
 async def test_deterministic_result_is_reproducible(

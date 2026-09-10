@@ -200,6 +200,7 @@ def test_checkpoint_is_atomic_ordered_unique_and_identity_bound(tmp_path: Path) 
             config_hash="config-a",
             provider="ollama",
             model="model-a",
+            model_digest="digest-a",
         )
         == []
     )
@@ -213,6 +214,7 @@ def test_checkpoint_is_atomic_ordered_unique_and_identity_bound(tmp_path: Path) 
         config_hash="config-a",
         provider="ollama",
         model="model-a",
+        model_digest="digest-a",
     )
     assert [item.sample_id for item in resumed] == [samples[0].sample_id, samples[1].sample_id]
     with pytest.raises(EvaluationRunError, match="identity"):
@@ -223,5 +225,29 @@ def test_checkpoint_is_atomic_ordered_unique_and_identity_bound(tmp_path: Path) 
             config_hash="different-config",
             provider="ollama",
             model="model-a",
+            model_digest="digest-a",
         )
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_checkpoint_rejects_changed_profile_or_timeout_identity(tmp_path: Path) -> None:
+    samples = load_samples(DIAGNOSTIC)[:1]
+    load_or_initialize_checkpoint(
+        tmp_path,
+        samples,
+        dataset_sha256="dataset",
+        config_hash="baseline-profile-timeout-75",
+        provider="ollama",
+        model="model-a",
+        model_digest="digest-a",
+    )
+    with pytest.raises(EvaluationRunError, match="identity"):
+        load_or_initialize_checkpoint(
+            tmp_path,
+            samples,
+            dataset_sha256="dataset",
+            config_hash="different-profile-or-timeout",
+            provider="ollama",
+            model="model-a",
+            model_digest="digest-a",
+        )

@@ -10,6 +10,7 @@ from app.core.config import Settings
 from app.core.exceptions import RaterError
 from app.evaluation.baseline import (
     BaselineFreezeError,
+    official_baseline_settings,
     require_clean_freeze_source,
     write_baseline_snapshot,
 )
@@ -20,7 +21,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("experiments/baseline/v1/config.json"))
     args = parser.parse_args()
-    settings = Settings()
+    settings = official_baseline_settings(Settings())
     try:
         require_clean_freeze_source()
     except BaselineFreezeError as exc:
@@ -37,6 +38,11 @@ def main() -> int:
     print(f"baseline_config={args.output}")
     print(f"config_hash={snapshot['config_hash']}")
     print(f"provider={snapshot['provider']}")
+    print(f"pipeline_config={snapshot['pipeline_config_path']}")
+    print(
+        "verification_timeout_seconds="
+        f"{snapshot['operational_config']['verification']['timeout_seconds']}"
+    )
     print(f"git_commit={snapshot['git_commit'] or 'UNAVAILABLE'}")
     print(f"working_tree_clean={snapshot['working_tree_clean']}")
     return 0

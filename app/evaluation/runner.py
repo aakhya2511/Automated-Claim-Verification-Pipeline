@@ -11,15 +11,19 @@ from typing import Any
 
 from app.bootstrap import build_container
 from app.core.config import Settings
-from app.core.pipeline_config import PipelineConfig
+from app.core.pipeline_config import PipelineConfig, load_pipeline_config
 from app.domain.enums import Verdict
 from app.evaluation.baseline import (
+    BASELINE_PIPELINE_PATH,
     canonical_hash,
     file_hash,
     git_identity,
+    official_baseline_settings,
+    operational_config,
     prompt_hash,
     source_tree_hash,
     unexpected_git_changes,
+    validate_official_timeout_hierarchy,
 )
 from app.evaluation.dev_corpus import validate_dev_bundle
 from app.evaluation.metrics import PredictionRow, calculate_metrics, prediction_from_result
@@ -83,6 +87,31 @@ def validate_baseline_integrity(
     if snapshot.get("source_tree_sha256") != source_tree_hash(repository):
         raise EvaluationRunError("current source tree does not match frozen baseline")
 
+    try:
+        validate_official_timeout_hierarchy(settings)
+    except RuntimeError as exc:
+        raise EvaluationRunError(str(exc)) from exc
+
+    pipeline_path_value = snapshot.get("pipeline_config_path")
+    if pipeline_path_value != BASELINE_PIPELINE_PATH.as_posix():
+        raise EvaluationRunError("official Phase 6 baseline must use configs/baseline.yaml")
+    pipeline_path = repository / pipeline_path_value
+    if snapshot.get("pipeline_config_sha256") != file_hash(pipeline_path):
+        raise EvaluationRunError("baseline pipeline profile does not match frozen baseline")
+    frozen_pipeline = PipelineConfig.model_validate(snapshot.get("pipeline_config"))
+    current_pipeline = load_pipeline_config(pipeline_path)
+    if frozen_pipeline != current_pipeline:
+        raise EvaluationRunError("resolved pipeline configuration does not match frozen baseline")
+    if snapshot.get("pipeline_profile_name") != frozen_pipeline.name:
+        raise EvaluationRunError("baseline pipeline profile name does not match frozen baseline")
+    effective_pipeline = frozen_pipeline.model_dump(mode="json")
+    if snapshot.get("pipeline_effective_config_sha256") != canonical_hash(effective_pipeline):
+        raise EvaluationRunError("effective pipeline configuration hash does not verify")
+    if snapshot.get("pipeline_config_file") != settings.pipeline_config_file:
+        raise EvaluationRunError("runtime pipeline profile does not match frozen baseline")
+    if snapshot.get("operational_config") != operational_config(settings):
+        raise EvaluationRunError("runtime operational configuration does not match frozen baseline")
+
     rater_version = snapshot.get("rater_prompt_version")
     extraction_version = snapshot.get("extraction_prompt_version")
     if not isinstance(rater_version, str) or snapshot.get("rater_prompt_sha256") != prompt_hash(
@@ -114,7 +143,7 @@ async def run_evaluation(
     *, dataset: Path, config_path: Path, output: Path, settings: Settings | None = None
 ) -> dict[str, Any]:
     assert_not_holdout(dataset)
-    resolved = settings or Settings()
+    resolved = official_baseline_settings(settings or Settings())
     snapshot = load_snapshot(config_path)
     validate_baseline_integrity(snapshot, dataset=dataset, settings=resolved)
     if resolved.llm.provider == "ollama":
@@ -140,6 +169,7 @@ async def run_evaluation(
         config_hash=str(snapshot["config_hash"]),
         provider=resolved.llm.provider,
         model=resolved.llm.model,
+        model_digest=_model_digest(snapshot),
     )
     container = build_container(settings=resolved, pipeline_config=pipeline)
     if container.service is None:
@@ -240,6 +270,7 @@ def load_or_initialize_checkpoint(
     config_hash: str,
     provider: str,
     model: str,
+    model_digest: str | None = None,
 ) -> list[PredictionRow]:
     output.mkdir(parents=True, exist_ok=True)
     metadata_path = output / "checkpoint.meta.json"
@@ -249,6 +280,7 @@ def load_or_initialize_checkpoint(
         "config_hash": config_hash,
         "provider": provider,
         "model": model,
+        "model_digest": model_digest,
     }
     if metadata_path.exists():
         actual_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -289,3 +321,9 @@ def _atomic_text(path: Path, content: str) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(content, encoding="utf-8")
     temporary.replace(path)
+
+
+def _model_digest(snapshot: dict[str, Any]) -> str | None:
+    metadata = snapshot.get("provider_metadata")
+    digest = metadata.get("model_digest") if isinstance(metadata, dict) else None
+    return digest if isinstance(digest, str) else None

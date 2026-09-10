@@ -12,6 +12,10 @@ from app.core.config import REPO_ROOT, Settings
 from app.core.pipeline_config import PipelineConfig, load_pipeline_config
 
 BASELINE_VERSION = "v1"
+BASELINE_PIPELINE_FILE = "baseline.yaml"
+BASELINE_PIPELINE_PATH = Path("configs") / BASELINE_PIPELINE_FILE
+BASELINE_LLM_TIMEOUT_SECONDS = 60.0
+BASELINE_VERIFICATION_TIMEOUT_SECONDS = 75.0
 SOURCE_PATTERNS = ("*.py", "*.yaml", "*.txt", "pyproject.toml", "Makefile")
 DIAGNOSTIC_DATASET = Path("data/evaluation/dev/v1/diagnostic.jsonl")
 ALLOWED_GENERATED_FILES = frozenset(
@@ -117,6 +121,52 @@ def require_clean_freeze_source(root: Path = REPO_ROOT) -> None:
         )
 
 
+def official_baseline_settings(settings: Settings) -> Settings:
+    """Bind Phase 6 operational settings independently of application defaults."""
+    resolved = settings.model_copy(
+        update={
+            "pipeline_config_file": BASELINE_PIPELINE_FILE,
+            "server": settings.server.model_copy(
+                update={"verification_timeout_seconds": BASELINE_VERIFICATION_TIMEOUT_SECONDS}
+            ),
+            "llm": settings.llm.model_copy(
+                update={"timeout_seconds": BASELINE_LLM_TIMEOUT_SECONDS}
+            ),
+        }
+    )
+    validate_official_timeout_hierarchy(resolved)
+    return resolved
+
+
+def validate_official_timeout_hierarchy(settings: Settings) -> None:
+    if settings.server.verification_timeout_seconds <= settings.llm.timeout_seconds:
+        raise BaselineFreezeError(
+            "official baseline verification deadline must exceed the total LLM budget"
+        )
+
+
+def operational_config(settings: Settings) -> dict[str, Any]:
+    """Return every runtime limit that can affect execution, routing, or latency."""
+    return {
+        "verification": {
+            "timeout_seconds": settings.server.verification_timeout_seconds,
+            "batch_concurrency": settings.server.batch_concurrency,
+            "max_batch_items": settings.server.max_batch_items,
+        },
+        "provider": {
+            "total_timeout_seconds": settings.llm.timeout_seconds,
+            "connect_timeout_seconds": settings.llm.connect_timeout_seconds,
+            "max_retries": settings.llm.max_retries,
+            "retry_base_delay_seconds": settings.llm.retry_base_delay_seconds,
+            "max_concurrency": settings.llm.max_concurrency,
+            "max_connections": settings.llm.max_connections,
+            "max_keepalive_connections": settings.llm.max_keepalive_connections,
+            "max_output_tokens": settings.llm.max_output_tokens,
+            "schema_version": settings.llm.schema_version,
+        },
+    }
+
+
 def build_baseline_snapshot(
     settings: Settings,
     pipeline: PipelineConfig,
@@ -127,6 +177,19 @@ def build_baseline_snapshot(
 ) -> dict[str, Any]:
     catalog_bytes = settings.data.reference_catalog_path.read_bytes()
     diagnostic = diagnostic_path or root / DIAGNOSTIC_DATASET
+    pipeline_path = settings.pipeline_config_path
+    try:
+        relative_pipeline_path = pipeline_path.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise BaselineFreezeError(
+            "baseline pipeline profile must be inside the repository"
+        ) from exc
+    if relative_pipeline_path != BASELINE_PIPELINE_PATH.as_posix():
+        raise BaselineFreezeError("official Phase 6 freeze must use configs/baseline.yaml")
+    source_pipeline = load_pipeline_config(pipeline_path)
+    if pipeline != source_pipeline or pipeline.name != "baseline":
+        raise BaselineFreezeError("resolved baseline profile does not match configs/baseline.yaml")
+    pipeline_value = pipeline.model_dump(mode="json")
     commit, status, clean = git_identity(root)
     snapshot: dict[str, Any] = {
         "baseline_version": BASELINE_VERSION,
@@ -147,16 +210,15 @@ def build_baseline_snapshot(
             settings.data.prompts_dir, "extractor", settings.llm.extraction_prompt_version
         ),
         "request_schema_version": pipeline.rater.schema_version,
-        "retry": {
-            "timeout_seconds": settings.llm.timeout_seconds,
-            "connect_timeout_seconds": settings.llm.connect_timeout_seconds,
-            "max_retries": settings.llm.max_retries,
-            "retry_base_delay_seconds": settings.llm.retry_base_delay_seconds,
-        },
         "catalog_fingerprint": hashlib.sha256(catalog_bytes).hexdigest(),
         "diagnostic_dataset_sha256": file_hash(diagnostic),
+        "pipeline_profile_name": pipeline.name,
+        "pipeline_config_path": relative_pipeline_path,
+        "pipeline_config_sha256": file_hash(pipeline_path),
+        "pipeline_effective_config_sha256": canonical_hash(pipeline_value),
         "pipeline_config_file": settings.pipeline_config_file,
-        "pipeline_config": pipeline.model_dump(mode="json"),
+        "pipeline_config": pipeline_value,
+        "operational_config": operational_config(settings),
         "provider_metadata": provider_metadata,
     }
     snapshot["config_hash"] = canonical_hash(snapshot)
@@ -173,6 +235,14 @@ def write_baseline_snapshot(
 ) -> dict[str, Any]:
     require_clean_freeze_source(root)
     resolved = settings or Settings()
+    if resolved.pipeline_config_file != BASELINE_PIPELINE_FILE:
+        raise BaselineFreezeError("official Phase 6 freeze must use configs/baseline.yaml")
+    validate_official_timeout_hierarchy(resolved)
+    if (
+        resolved.llm.timeout_seconds != BASELINE_LLM_TIMEOUT_SECONDS
+        or resolved.server.verification_timeout_seconds != BASELINE_VERIFICATION_TIMEOUT_SECONDS
+    ):
+        raise BaselineFreezeError("official Phase 6 freeze must use the pinned 60s/75s budgets")
     pipeline = load_pipeline_config(resolved.pipeline_config_path)
     snapshot = build_baseline_snapshot(
         resolved,
