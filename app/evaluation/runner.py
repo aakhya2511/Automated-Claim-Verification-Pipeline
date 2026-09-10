@@ -13,7 +13,14 @@ from app.bootstrap import build_container
 from app.core.config import Settings
 from app.core.pipeline_config import PipelineConfig
 from app.domain.enums import Verdict
-from app.evaluation.baseline import canonical_hash, git_identity, source_tree_hash
+from app.evaluation.baseline import (
+    canonical_hash,
+    file_hash,
+    git_identity,
+    prompt_hash,
+    source_tree_hash,
+    unexpected_git_changes,
+)
 from app.evaluation.dev_corpus import validate_dev_bundle
 from app.evaluation.metrics import PredictionRow, calculate_metrics, prediction_from_result
 from app.evaluation.models import EvaluationSample
@@ -55,24 +62,61 @@ def load_snapshot(path: Path) -> dict[str, Any]:
     return value
 
 
+def validate_baseline_integrity(
+    snapshot: dict[str, Any],
+    *,
+    dataset: Path,
+    settings: Settings,
+    root: Path | None = None,
+) -> None:
+    """Validate frozen inputs while permitting only named generated outputs."""
+    repository = root or Path(__file__).resolve().parents[2]
+    commit, _status, _clean = git_identity(repository)
+    changes = unexpected_git_changes(repository)
+    if commit is None or changes is None:
+        raise EvaluationRunError("official baseline requires a valid Git repository")
+    if snapshot.get("git_commit") != commit:
+        raise EvaluationRunError("current Git commit does not match frozen baseline")
+    if changes:
+        changed = ", ".join(sorted(changes))
+        raise EvaluationRunError(f"non-generated files changed after baseline freeze: {changed}")
+    if snapshot.get("source_tree_sha256") != source_tree_hash(repository):
+        raise EvaluationRunError("current source tree does not match frozen baseline")
+
+    rater_version = snapshot.get("rater_prompt_version")
+    extraction_version = snapshot.get("extraction_prompt_version")
+    if not isinstance(rater_version, str) or snapshot.get("rater_prompt_sha256") != prompt_hash(
+        settings.data.prompts_dir, "rater", rater_version
+    ):
+        raise EvaluationRunError("rater prompt does not match frozen baseline")
+    if not isinstance(extraction_version, str) or snapshot.get(
+        "extraction_prompt_sha256"
+    ) != prompt_hash(settings.data.prompts_dir, "extractor", extraction_version):
+        raise EvaluationRunError("extraction prompt does not match frozen baseline")
+    if snapshot.get("catalog_fingerprint") != file_hash(settings.data.reference_catalog_path):
+        raise EvaluationRunError("reference catalog does not match frozen baseline")
+    if snapshot.get("diagnostic_dataset_sha256") != file_hash(dataset):
+        raise EvaluationRunError("diagnostic dataset does not match frozen baseline")
+
+    validate_real_provider(settings)
+    if (
+        snapshot.get("provider") != settings.llm.provider
+        or snapshot.get("model") != settings.llm.model
+    ):
+        raise EvaluationRunError("runtime provider/model does not match frozen baseline")
+    if snapshot.get("provider_base_url") != settings.llm.base_url:
+        raise EvaluationRunError("runtime provider endpoint does not match frozen baseline")
+    if snapshot.get("temperature") != settings.llm.temperature:
+        raise EvaluationRunError("runtime temperature does not match frozen baseline")
+
+
 async def run_evaluation(
     *, dataset: Path, config_path: Path, output: Path, settings: Settings | None = None
 ) -> dict[str, Any]:
     assert_not_holdout(dataset)
     resolved = settings or Settings()
     snapshot = load_snapshot(config_path)
-    commit, _status, clean = git_identity()
-    if commit is None or clean is not True:
-        raise EvaluationRunError("official baseline requires a valid Git commit and clean tree")
-    if snapshot.get("git_commit") != commit:
-        raise EvaluationRunError("current Git commit does not match frozen baseline")
-    if snapshot.get("source_tree_sha256") != source_tree_hash():
-        raise EvaluationRunError("current source tree does not match frozen baseline")
-    validate_real_provider(resolved)
-    if snapshot["provider"] != resolved.llm.provider or snapshot["model"] != resolved.llm.model:
-        raise EvaluationRunError("runtime provider/model does not match frozen baseline")
-    if snapshot.get("provider_base_url") != resolved.llm.base_url:
-        raise EvaluationRunError("runtime provider endpoint does not match frozen baseline")
+    validate_baseline_integrity(snapshot, dataset=dataset, settings=resolved)
     if resolved.llm.provider == "ollama":
         identity = await preflight_ollama(resolved.llm)
         frozen_identity = snapshot.get("provider_metadata")

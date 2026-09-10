@@ -8,7 +8,11 @@ from pathlib import Path
 
 from app.core.config import Settings
 from app.core.exceptions import RaterError
-from app.evaluation.baseline import write_baseline_snapshot
+from app.evaluation.baseline import (
+    BaselineFreezeError,
+    require_clean_freeze_source,
+    write_baseline_snapshot,
+)
 from app.raters.ollama import preflight_ollama
 
 
@@ -17,6 +21,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("experiments/baseline/v1/config.json"))
     args = parser.parse_args()
     settings = Settings()
+    try:
+        require_clean_freeze_source()
+    except BaselineFreezeError as exc:
+        print(f"baseline_freeze=FAILED: {exc}")
+        return 2
     provider_metadata = None
     if settings.llm.provider == "ollama":
         try:

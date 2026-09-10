@@ -13,6 +13,18 @@ from app.core.pipeline_config import PipelineConfig, load_pipeline_config
 
 BASELINE_VERSION = "v1"
 SOURCE_PATTERNS = ("*.py", "*.yaml", "*.txt", "pyproject.toml", "Makefile")
+DIAGNOSTIC_DATASET = Path("data/evaluation/dev/v1/diagnostic.jsonl")
+ALLOWED_GENERATED_FILES = frozenset(
+    {
+        "experiments/baseline/v1/config.json",
+        "experiments/baseline/v1/metadata.json",
+    }
+)
+ALLOWED_GENERATED_PREFIXES = ("artifacts/baseline/v1/",)
+
+
+class BaselineFreezeError(RuntimeError):
+    """The repository cannot be frozen as an official baseline."""
 
 
 def canonical_hash(value: dict[str, Any]) -> str:
@@ -57,14 +69,64 @@ def git_identity(root: Path = REPO_ROOT) -> tuple[str | None, str, bool | None]:
     return commit, status if status else "clean", not bool(status)
 
 
+def git_changed_paths(root: Path = REPO_ROOT) -> set[str] | None:
+    """Return every tracked or untracked path reported by Git porcelain v1."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    records = result.stdout.split(b"\0")
+    paths: set[str] = set()
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
+            continue
+        status = record[:2]
+        paths.add(record[3:].decode("utf-8", errors="surrogateescape"))
+        if (b"R" in status or b"C" in status) and index < len(records) and records[index]:
+            paths.add(records[index].decode("utf-8", errors="surrogateescape"))
+            index += 1
+    return paths
+
+
+def unexpected_git_changes(root: Path = REPO_ROOT) -> set[str] | None:
+    paths = git_changed_paths(root)
+    if paths is None:
+        return None
+    return {
+        path
+        for path in paths
+        if path not in ALLOWED_GENERATED_FILES
+        and not any(path.startswith(prefix) for prefix in ALLOWED_GENERATED_PREFIXES)
+    }
+
+
+def require_clean_freeze_source(root: Path = REPO_ROOT) -> None:
+    commit, _status, clean = git_identity(root)
+    if commit is None or clean is not True:
+        raise BaselineFreezeError(
+            "baseline freeze requires a valid Git commit and completely clean working tree"
+        )
+
+
 def build_baseline_snapshot(
     settings: Settings,
     pipeline: PipelineConfig,
     *,
     root: Path = REPO_ROOT,
+    diagnostic_path: Path | None = None,
     provider_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     catalog_bytes = settings.data.reference_catalog_path.read_bytes()
+    diagnostic = diagnostic_path or root / DIAGNOSTIC_DATASET
     commit, status, clean = git_identity(root)
     snapshot: dict[str, Any] = {
         "baseline_version": BASELINE_VERSION,
@@ -77,11 +139,11 @@ def build_baseline_snapshot(
         "model": settings.llm.model,
         "temperature": settings.llm.temperature,
         "rater_prompt_version": pipeline.rater.prompt_version,
-        "rater_prompt_sha256": _prompt_hash(
+        "rater_prompt_sha256": prompt_hash(
             settings.data.prompts_dir, "rater", pipeline.rater.prompt_version
         ),
         "extraction_prompt_version": settings.llm.extraction_prompt_version,
-        "extraction_prompt_sha256": _prompt_hash(
+        "extraction_prompt_sha256": prompt_hash(
             settings.data.prompts_dir, "extractor", settings.llm.extraction_prompt_version
         ),
         "request_schema_version": pipeline.rater.schema_version,
@@ -92,6 +154,7 @@ def build_baseline_snapshot(
             "retry_base_delay_seconds": settings.llm.retry_base_delay_seconds,
         },
         "catalog_fingerprint": hashlib.sha256(catalog_bytes).hexdigest(),
+        "diagnostic_dataset_sha256": file_hash(diagnostic),
         "pipeline_config_file": settings.pipeline_config_file,
         "pipeline_config": pipeline.model_dump(mode="json"),
         "provider_metadata": provider_metadata,
@@ -104,15 +167,28 @@ def write_baseline_snapshot(
     output: Path,
     settings: Settings | None = None,
     *,
+    root: Path = REPO_ROOT,
+    diagnostic_path: Path | None = None,
     provider_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    require_clean_freeze_source(root)
     resolved = settings or Settings()
     pipeline = load_pipeline_config(resolved.pipeline_config_path)
-    snapshot = build_baseline_snapshot(resolved, pipeline, provider_metadata=provider_metadata)
+    snapshot = build_baseline_snapshot(
+        resolved,
+        pipeline,
+        root=root,
+        diagnostic_path=diagnostic_path,
+        provider_metadata=provider_metadata,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return snapshot
 
 
-def _prompt_hash(root: Path, kind: str, version: str) -> str:
-    return hashlib.sha256((root / kind / f"{version}.txt").read_bytes()).hexdigest()
+def file_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def prompt_hash(root: Path, kind: str, version: str) -> str:
+    return file_hash(root / kind / f"{version}.txt")
