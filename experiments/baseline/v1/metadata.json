@@ -1,0 +1,13 @@
+{
+  "baseline_evaluation": "NOT_COMPLETE",
+  "diagnostic_validation": "PASS",
+  "holdout_evaluated": false,
+  "overlap_validation": "PASS",
+  "prediction_count": 0,
+  "real_provider_configured": false,
+  "source_revision_available": false,
+  "blockers": [
+    "The workspace is not a Git repository, so no commit SHA or clean-tree status is available.",
+    "The configured provider is fake and no real-provider credential is present."
+  ]
+}

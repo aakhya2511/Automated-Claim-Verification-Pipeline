@@ -1,0 +1,90 @@
+{
+  "baseline_version": "v1",
+  "catalog_fingerprint": "dab11bd68087b4771b85ac301aeea601fd539c456cc371140f60d7247c197def",
+  "config_hash": "564683822d1ab916bf95fa3702b25d0f3363fefce5fa8925b510d5400bfd7ad4",
+  "extraction_prompt_sha256": "560b48153dc8a5f96043f7c6ac0787ce13771bca732c80d13614782166cfc289",
+  "extraction_prompt_version": "v1",
+  "git_commit": null,
+  "model": "gpt-4o-mini",
+  "pipeline_config": {
+    "cache": {
+      "enabled": true,
+      "max_entries": 10000,
+      "ttl_seconds": 300
+    },
+    "decision": {
+      "abstain_below": 0.5,
+      "conflict_policy": "rules_win",
+      "contradiction_threshold": 0.7,
+      "heuristics": {
+        "block_support_without_evidence": true,
+        "demote_contradiction_on_missing_field": true,
+        "enforce_offer_window": true,
+        "require_numeric_agreement": true,
+        "respect_qualifiers": true
+      },
+      "rater_confidence_scale": 0.95,
+      "support_threshold": 0.6
+    },
+    "description": "Deterministic normalization and rules first, LLM rater only for ambiguous claims.",
+    "experiment_id": "exp-optimized-v1",
+    "name": "optimized",
+    "normalization": {
+      "alias_resolution": true,
+      "currency_normalization": true,
+      "deterministic_parsing": true,
+      "llm_extraction_below_confidence": 0.8,
+      "llm_extraction_fallback": true,
+      "max_claim_chars": 1000,
+      "min_claim_chars": 3,
+      "negation_detection": true,
+      "qualifier_detection": true
+    },
+    "pipeline_version": "1.0.0",
+    "rater": {
+      "always_invoke": false,
+      "enabled": true,
+      "invoke_on_missing_evidence": false,
+      "invoke_on_unresolved_entity": false,
+      "max_concurrency": 8,
+      "max_output_tokens": 256,
+      "prompt_version": "v1",
+      "schema_version": "1.0",
+      "temperature": 0.0
+    },
+    "retrieval": {
+      "evidence_projection": "claim_scoped",
+      "include_terms_text": true,
+      "max_candidates": 5,
+      "min_match_score": 0.45,
+      "strategy": "id_then_lexical"
+    },
+    "rules": {
+      "allow_terminal_contradicted": true,
+      "allow_terminal_supported": true,
+      "approximate_relative_tolerance": 0.05,
+      "date_grace_days": 0,
+      "enabled": true,
+      "min_terminal_confidence": 0.9,
+      "percent_absolute_tolerance": 0.01,
+      "price_absolute_tolerance": 0.01,
+      "price_relative_tolerance": 0.0,
+      "trial_days_tolerance": 0
+    }
+  },
+  "pipeline_config_file": "optimized.yaml",
+  "provider": "fake",
+  "rater_prompt_sha256": "2cf1068ba424f99a42f3e8defe640c2cf847d5a284f5dd8a39a912b50371c6b4",
+  "rater_prompt_version": "v1",
+  "request_schema_version": "1.0",
+  "retry": {
+    "connect_timeout_seconds": 2.0,
+    "max_retries": 2,
+    "retry_base_delay_seconds": 0.25,
+    "timeout_seconds": 6.0
+  },
+  "source_tree_sha256": "b1ece94220923512a96f01faa1832fafc82d625e40a36273aa304bc19490f2be",
+  "temperature": 0.0,
+  "working_tree_clean": null,
+  "working_tree_status": "git repository unavailable"
+}

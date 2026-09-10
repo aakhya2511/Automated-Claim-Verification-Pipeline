@@ -1,0 +1,8 @@
+{
+  "claim_reference_overlap": 0,
+  "diagnostic_samples": 400,
+  "exact_claim_overlap": 0,
+  "holdout_samples": 500,
+  "sample_fingerprint_overlap": 0,
+  "semantic_mutation_overlap": 0
+}

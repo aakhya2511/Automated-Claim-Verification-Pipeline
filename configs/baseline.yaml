@@ -1,0 +1,69 @@
+# Baseline arm: "retrieve the record, ask the model, return its answer."
+#
+# This is the naive design the project argues against, kept as a real, runnable
+# configuration so the comparison is measured rather than asserted. It shares
+# every line of code with the optimized arm; only the behaviour flags differ,
+# which is what makes the delta attributable to the pipeline design.
+#
+# Characteristics:
+#   * no structured claim parsing  -> the model sees the raw sentence
+#   * no deterministic rules       -> every claim costs a model call
+#   * whole record in the prompt   -> more tokens, more distractor fields
+#   * no post-rater guards         -> the model's verdict is final
+#   * no confidence thresholds     -> the pipeline never abstains
+name: baseline
+description: Single-shot LLM rater over the full reference record, no deterministic layer.
+experiment_id: exp-baseline-v1
+
+normalization:
+  deterministic_parsing: false
+  llm_extraction_fallback: false
+  llm_extraction_below_confidence: 0.8
+  alias_resolution: false
+  negation_detection: false
+  qualifier_detection: false
+  currency_normalization: false
+  max_claim_chars: 1000
+  min_claim_chars: 3
+
+retrieval:
+  # Explicit reference_id only. Without alias resolution or lexical fallback,
+  # a claim that names a product in prose resolves to nothing.
+  strategy: id_only
+  max_candidates: 1
+  min_match_score: 0.0
+  evidence_projection: full_record
+  include_terms_text: true
+
+rules:
+  enabled: false
+
+rater:
+  enabled: true
+  prompt_version: v1
+  schema_version: "1.0"
+  temperature: 0.0
+  max_output_tokens: 256
+  always_invoke: true
+  invoke_on_missing_evidence: true
+  invoke_on_unresolved_entity: true
+  max_concurrency: 8
+
+decision:
+  # Accept whatever the model says, at whatever confidence it reports.
+  contradiction_threshold: 0.0
+  support_threshold: 0.0
+  abstain_below: 0.0
+  conflict_policy: rater_wins
+  rater_confidence_scale: 1.0
+  heuristics:
+    demote_contradiction_on_missing_field: false
+    respect_qualifiers: false
+    require_numeric_agreement: false
+    block_support_without_evidence: false
+    enforce_offer_window: false
+
+cache:
+  enabled: false
+  ttl_seconds: 300
+  max_entries: 10000

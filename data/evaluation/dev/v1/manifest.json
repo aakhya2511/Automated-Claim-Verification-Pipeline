@@ -1,0 +1,52 @@
+{
+  "catalog_fingerprint": "dab11bd68087b4771b85ac301aeea601fd539c456cc371140f60d7247c197def",
+  "claim_type_distribution": {
+    "availability": 30,
+    "discount": 31,
+    "feature_exclusion": 32,
+    "feature_inclusion": 46,
+    "geo_eligibility": 28,
+    "minimum_purchase": 41,
+    "price": 35,
+    "promotion_dates": 35,
+    "shipping": 27,
+    "subscription_terms": 30,
+    "trial_duration": 25,
+    "unknown": 40
+  },
+  "dataset_version": "dev-v1",
+  "difficulty_distribution": {
+    "EASY": 113,
+    "HARD": 161,
+    "MODERATE": 126
+  },
+  "generator_version": "1.0.0",
+  "mutation_distribution": {
+    "AVAILABILITY_MISMATCH": 16,
+    "DISCOUNT_MISMATCH": 15,
+    "FEATURE_EXCLUSION_MISMATCH": 16,
+    "FEATURE_INCLUSION_MISMATCH": 14,
+    "MINIMUM_PURCHASE_MISMATCH": 15,
+    "PRICE_MISMATCH": 19,
+    "PROMOTION_END_MISMATCH": 17,
+    "REGION_MISMATCH": 14,
+    "SHIPPING_MISMATCH": 13,
+    "SUBSCRIPTION_PRICE_MISMATCH": 16,
+    "TRIAL_DURATION_MISMATCH": 14
+  },
+  "sample_count": 400,
+  "seed": 20260910,
+  "sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
+  "source_distribution": {
+    "CLEAN": 162,
+    "INSUFFICIENT": 42,
+    "INVALID": 27,
+    "MUTATED": 169
+  },
+  "verdict_distribution": {
+    "CONTRADICTED": 169,
+    "INSUFFICIENT_EVIDENCE": 42,
+    "INVALID_CLAIM": 27,
+    "SUPPORTED": 162
+  }
+}

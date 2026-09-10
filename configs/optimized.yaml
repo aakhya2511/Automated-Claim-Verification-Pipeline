@@ -1,0 +1,84 @@
+# Optimized arm: hybrid deterministic-first pipeline. This is the production profile.
+#
+# Each setting below exists to address a failure class observed in baseline
+# error analysis (see docs/error-analysis.md). Values here are the starting
+# point for phase 7 tuning; they are chosen on a development split, not on the
+# evaluation set.
+name: optimized
+description: Deterministic normalization and rules first, LLM rater only for ambiguous claims.
+experiment_id: exp-optimized-v1
+
+normalization:
+  # Structured parsing is what makes early exit possible: without a typed
+  # claim there is nothing for a rule to compare.
+  deterministic_parsing: true
+  llm_extraction_fallback: true
+  llm_extraction_below_confidence: 0.8
+  alias_resolution: true
+  negation_detection: true
+  qualifier_detection: true
+  currency_normalization: true
+  max_claim_chars: 1000
+  min_claim_chars: 3
+
+retrieval:
+  strategy: id_then_lexical
+  max_candidates: 5
+  min_match_score: 0.45
+  # Only claim-relevant fields reach the prompt. Fewer distractor numbers means
+  # fewer invented contradictions, and a materially smaller prompt.
+  evidence_projection: claim_scoped
+  include_terms_text: true
+
+rules:
+  enabled: true
+  # Absolute cent tolerance absorbs representation noise (19.99 vs 19.990)
+  # without accepting a real mismatch such as 149 vs 199.
+  price_absolute_tolerance: 0.01
+  price_relative_tolerance: 0.0
+  percent_absolute_tolerance: 0.01
+  # Widened band applied only to explicitly hedged claims ("approximately $200").
+  approximate_relative_tolerance: 0.05
+  trial_days_tolerance: 0
+  date_grace_days: 0
+  allow_terminal_supported: true
+  allow_terminal_contradicted: true
+  min_terminal_confidence: 0.9
+
+rater:
+  enabled: true
+  prompt_version: v1
+  schema_version: "1.0"
+  temperature: 0.0
+  max_output_tokens: 256
+  # Escalate only what the deterministic layer could not settle.
+  always_invoke: false
+  # Missing evidence is an abstention by definition. Asking the model here was
+  # the single largest source of baseline false positives.
+  invoke_on_missing_evidence: false
+  invoke_on_unresolved_entity: false
+  max_concurrency: 8
+
+decision:
+  # Asymmetric thresholds: a contradiction is the costlier error for this
+  # service (it flags real, published copy as wrong), so it needs more
+  # confidence than a support verdict.
+  contradiction_threshold: 0.70
+  support_threshold: 0.60
+  abstain_below: 0.50
+  conflict_policy: rules_win
+  # Rater-only verdicts are down-weighted relative to deterministic ones.
+  rater_confidence_scale: 0.95
+  heuristics:
+    demote_contradiction_on_missing_field: true
+    respect_qualifiers: true
+    require_numeric_agreement: true
+    block_support_without_evidence: true
+    enforce_offer_window: true
+
+cache:
+  # Safe because the cache key includes the reference record's updated_at, so a
+  # catalog change invalidates affected entries instead of serving stale truth.
+  enabled: true
+  ttl_seconds: 300
+  max_entries: 10000
