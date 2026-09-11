@@ -49,6 +49,11 @@ artifacts/phase8/**
 !artifacts/phase8/performance/routing.json
 !artifacts/phase8/performance/summary.md
 !artifacts/phase8/performance/workload_manifest.json
+!artifacts/release/
+artifacts/release/**
+!artifacts/release/final_identity.json
+!artifacts/release/release_manifest.json
+!artifacts/release/RELEASE.md
 
 # Baseline run identity is generated after the clean source commit.
 experiments/baseline/*/config.json

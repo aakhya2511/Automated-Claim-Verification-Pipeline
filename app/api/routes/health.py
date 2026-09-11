@@ -86,6 +86,16 @@ async def ready(container: ContainerDep, response: Response) -> ReadinessRespons
     )
 
 
-@router.get("/metrics", summary="Prometheus exposition", include_in_schema=False)
+@router.get(
+    "/metrics",
+    summary="Prometheus exposition",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Prometheus text exposition",
+            "content": {"text/plain": {"schema": {"type": "string"}}},
+        }
+    },
+)
 async def metrics(metrics_sink: MetricsDep) -> Response:
     return Response(content=metrics_sink.render(), media_type=CONTENT_TYPE_LATEST)

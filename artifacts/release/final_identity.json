@@ -1,0 +1,20 @@
+{
+  "development_corpus_sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
+  "effective_optimized_config_sha256": "1bbc8aeaa6285fbc997bcc9e7e93d12d2875c42961fc7a688115817f9e3d662f",
+  "extractor_prompt_sha256": "560b48153dc8a5f96043f7c6ac0787ce13771bca732c80d13614782166cfc289",
+  "git_commit_sha": "b6b908ead8280154cd083735ef5aaaf338bcbf0e",
+  "holdout_sha256": "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7",
+  "lockfile_sha256": "0438788fa09b49454faa4754e349de9048090056d81e87eaeb25c6561373c1b7",
+  "optimized_prediction_sha256": "68b87f0712b40aae11cac4592e54b6e8cc3c8142f0e6e2bbdfbabafbe4cfa2bd",
+  "optimized_profile_sha256": "a53d8c6558b11f3f8094e3288ce3e2e5169b8baae5cc2b37367e117b781314b5",
+  "performance_workload_sha256": "4e91cd16260afc5f4962c1923a49bd2eb8e3d189eea0ab3e22a56d2e5a3d94f3",
+  "phase8_baseline_prediction_sha256": "d8a6ae39bad56ca63c4e3d1750817d8557e75669d160e0d299d9927fb235e463",
+  "project_version": "0.1.0",
+  "python_version": "3.12.14",
+  "rater_prompt_sha256": "2cf1068ba424f99a42f3e8defe640c2cf847d5a284f5dd8a39a912b50371c6b4",
+  "reference_catalog_sha256": "dab11bd68087b4771b85ac301aeea601fd539c456cc371140f60d7247c197def",
+  "release_commit_sha": null,
+  "release_commit_state": "pending_phase10_audit_commit",
+  "source_tree_hash_algorithm": "app.evaluation.baseline.source_tree_hash",
+  "source_tree_sha256": "6a99bd172c33c44d59a5486f1842e909e7e10de0f0934fd2e4f1393ca43d935f"
+}
