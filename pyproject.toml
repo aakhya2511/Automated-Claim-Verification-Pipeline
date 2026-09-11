@@ -14,9 +14,7 @@ dependencies = [
     "httpx>=0.27",
     "structlog>=24.4",
     "prometheus-client>=0.21",
-    "orjson>=3.10",
     "pyyaml>=6.0",
-    "tenacity>=9.0",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +26,7 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
     "types-PyYAML>=6.0",
+    "build>=1.2",
 ]
 
 [build-system]
@@ -36,6 +35,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"configs/phase7/optimized_final.yaml" = "app/resources/configs/phase7/optimized_final.yaml"
+"prompts/rater/v1.txt" = "app/resources/prompts/rater/v1.txt"
+"prompts/extractor/v1.txt" = "app/resources/prompts/extractor/v1.txt"
+"data/reference/catalog.jsonl" = "app/resources/data/reference/catalog.jsonl"
 
 # --------------------------------------------------------------------------- #
 # ruff

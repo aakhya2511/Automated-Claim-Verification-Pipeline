@@ -1,8 +1,3 @@
-# Secrets
-.env
-.env.*
-!.env.example
-
 # Python
 __pycache__/
 *.py[cod]
@@ -20,10 +15,40 @@ dist/
 coverage.xml
 htmlcov/
 
-# Generated evaluation output. Committed report snapshots live in docs/ and
-# experiments/; raw run output is reproducible via `make evaluate`.
+# Generated evaluation output is ignored by default. Phase 8's small final
+# reports/provenance are explicit exceptions; raw predictions, checkpoints,
+# workloads, error payloads, invalid runs, and temporary output remain ignored.
 artifacts/*
 !artifacts/.gitkeep
+!artifacts/phase8/
+artifacts/phase8/**
+!artifacts/phase8/resume_claim_validation.md
+!artifacts/phase8/holdout/
+!artifacts/phase8/holdout/comparison.json
+!artifacts/phase8/holdout/comparison.md
+!artifacts/phase8/holdout/finality.json
+!artifacts/phase8/holdout/baseline/
+!artifacts/phase8/holdout/optimized/
+!artifacts/phase8/holdout/baseline/candidate_identity.json
+!artifacts/phase8/holdout/baseline/confusion_matrix.json
+!artifacts/phase8/holdout/baseline/latency.json
+!artifacts/phase8/holdout/baseline/metrics.json
+!artifacts/phase8/holdout/baseline/routing.json
+!artifacts/phase8/holdout/baseline/summary.json
+!artifacts/phase8/holdout/baseline/summary.md
+!artifacts/phase8/holdout/optimized/candidate_identity.json
+!artifacts/phase8/holdout/optimized/confusion_matrix.json
+!artifacts/phase8/holdout/optimized/latency.json
+!artifacts/phase8/holdout/optimized/metrics.json
+!artifacts/phase8/holdout/optimized/routing.json
+!artifacts/phase8/holdout/optimized/summary.json
+!artifacts/phase8/holdout/optimized/summary.md
+!artifacts/phase8/performance/
+!artifacts/phase8/performance/latency.json
+!artifacts/phase8/performance/metrics.json
+!artifacts/phase8/performance/routing.json
+!artifacts/phase8/performance/summary.md
+!artifacts/phase8/performance/workload_manifest.json
 
 # Baseline run identity is generated after the clean source commit.
 experiments/baseline/*/config.json

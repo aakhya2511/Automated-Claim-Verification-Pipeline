@@ -4,29 +4,63 @@ Every log line is a JSON object with a stable field set. ``request_id`` is bound
 to a context variable at the edge so it is attached automatically to every line
 emitted while handling that request, including deep inside the rater adapter.
 
-Two rules are enforced by construction rather than by convention:
-
-* API keys are never logged — the settings object stores them as ``SecretStr``
-  and nothing in the logging path stringifies settings.
-* Raw claim text is only logged when ``observability.log_claim_text`` is on
-  (default off), since it is user-supplied content.
+Credentials are stored as ``SecretStr`` and a recursive final processor scrubs
+credential-shaped keys at every nesting level. Raw claims and provider payloads
+are never part of the production logging contract.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
 _request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 _REDACTED = "***redacted***"
-_SENSITIVE_KEYS = frozenset({"api_key", "authorization", "token", "secret", "password"})
+_SENSITIVE_KEYS = frozenset(
+    {
+        "authorization",
+        "apikey",
+        "accesstoken",
+        "refreshtoken",
+        "clientsecret",
+        "password",
+        "secret",
+        "token",
+    }
+)
+
+
+def _normalized_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value).casefold())
+
+
+def _is_sensitive_key(value: object) -> bool:
+    normalized = _normalized_key(value)
+    return normalized in _SENSITIVE_KEYS or normalized.endswith(
+        ("authorization", "apikey", "accesstoken", "refreshtoken", "clientsecret")
+    )
+
+
+def redact_secrets(value: Any) -> Any:
+    """Recursively redact credential-shaped mapping entries."""
+    if isinstance(value, Mapping):
+        return {
+            key: (_REDACTED if _is_sensitive_key(key) else redact_secrets(item))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_secrets(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_secrets(item) for item in value)
+    return value
 
 
 def _add_request_id(
@@ -42,10 +76,7 @@ def _redact_sensitive(
     _logger: Any, _method: str, event_dict: structlog.types.EventDict
 ) -> structlog.types.EventDict:
     """Defence in depth: scrub anything that looks like a credential."""
-    for key in list(event_dict):
-        if key.lower() in _SENSITIVE_KEYS:
-            event_dict[key] = _REDACTED
-    return event_dict
+    return cast(structlog.types.EventDict, redact_secrets(event_dict))
 
 
 def configure_logging(*, level: str = "INFO", log_format: str = "json") -> None:

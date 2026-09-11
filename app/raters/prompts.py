@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.core.exceptions import ConfigurationError
+from app.core.resources import DEFAULT_PROMPTS_DIR
 
-PROMPTS_ROOT = Path(__file__).resolve().parents[2] / "prompts"
+PROMPTS_ROOT = DEFAULT_PROMPTS_DIR
 
 
 def load_prompt(kind: str, version: str, *, root: Path = PROMPTS_ROOT) -> str:

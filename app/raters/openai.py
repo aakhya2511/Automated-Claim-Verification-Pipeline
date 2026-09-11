@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
@@ -17,7 +18,7 @@ from app.domain.models import (
     RatingTrace,
     ReferenceEvidence,
 )
-from app.raters.prompts import load_prompt
+from app.raters.prompts import PROMPTS_ROOT, load_prompt
 from app.raters.schemas import RATING_JSON_SCHEMA, SemanticRatingPayload
 from app.raters.transport import OpenAIResponsesTransport
 
@@ -31,11 +32,12 @@ class OpenAIRater:
         *,
         transport: OpenAIResponsesTransport | None = None,
         prompt_version: str | None = None,
+        prompts_dir: Path | None = None,
     ) -> None:
         self._settings = settings
         self._transport = transport or OpenAIResponsesTransport(settings)
         self._prompt_version = prompt_version or settings.rater_prompt_version
-        self._prompt = load_prompt("rater", self._prompt_version)
+        self._prompt = load_prompt("rater", self._prompt_version, root=prompts_dir or PROMPTS_ROOT)
 
     @property
     def provider_name(self) -> str:

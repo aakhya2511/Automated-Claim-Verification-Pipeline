@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ACV_ENVIRONMENT: development
+      ACV_LLM__PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.12"
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked dependencies
+        run: uv sync --frozen --extra dev
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format check
+        run: uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy --strict app
+      - name: Test
+        run: uv run pytest
+      - name: Verify frozen release inputs
+        run: uv run python scripts/check_release_integrity.py
+      - name: Build distributions
+        run: uv run python -m build
+      - name: Smoke-test installed wheel
+        run: uv run python scripts/installed_wheel_smoke.py

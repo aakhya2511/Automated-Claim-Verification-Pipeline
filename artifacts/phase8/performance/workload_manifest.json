@@ -1,0 +1,28 @@
+{
+  "benchmark": "phase8_optimized_service_performance_v1",
+  "cache_enabled": false,
+  "claim_type_distribution": {
+    "availability": 90,
+    "discount": 93,
+    "feature_exclusion": 96,
+    "feature_inclusion": 138,
+    "geo_eligibility": 84,
+    "minimum_purchase": 123,
+    "price": 105,
+    "promotion_dates": 105,
+    "shipping": 81,
+    "subscription_terms": 90,
+    "trial_duration": 75,
+    "unknown": 120
+  },
+  "frozen_before_holdout_evaluation": true,
+  "holdout_predictions_used": false,
+  "provider_concurrency": 1,
+  "repetitions": 3,
+  "request_concurrency": 1,
+  "sample_count": 1200,
+  "service_batch_concurrency": 1,
+  "source": "frozen Phase 7 development requests repeated three times with labels removed",
+  "source_dataset_sha256": "e1d2c8cd5668eb64a82794a19bc19c9dc760641b31d06e31bc71e161add6ae34",
+  "workload_sha256": "4e91cd16260afc5f4962c1923a49bd2eb8e3d189eea0ab3e22a56d2e5a3d94f3"
+}

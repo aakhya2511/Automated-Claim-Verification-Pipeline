@@ -92,19 +92,26 @@ def build_container(
             resolved_settings.llm,
             transport=transport,
             prompt_version=resolved_config.rater.prompt_version,
+            prompts_dir=resolved_settings.data.prompts_dir,
         )
-        extractor = OpenAIClaimExtractor(resolved_settings.llm, transport=transport)
+        extractor = OpenAIClaimExtractor(
+            resolved_settings.llm,
+            transport=transport,
+            prompts_dir=resolved_settings.data.prompts_dir,
+        )
     elif resolved_settings.llm.provider == "ollama":
         ollama_transport = OllamaTransport(resolved_settings.llm)
         rater = OllamaRater(
             resolved_settings.llm,
             transport=ollama_transport,
             prompt_version=resolved_config.rater.prompt_version,
+            prompts_dir=resolved_settings.data.prompts_dir,
         )
         extractor = OllamaClaimExtractor(
             resolved_settings.llm,
             transport=ollama_transport,
             prompt_version=resolved_settings.llm.extraction_prompt_version,
+            prompts_dir=resolved_settings.data.prompts_dir,
         )
 
     clock = SystemClock()

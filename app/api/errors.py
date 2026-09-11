@@ -5,8 +5,9 @@ Every failure leaves the service in the same shape::
     {"error": {"code": "...", "message": "...", "details": {...}},
      "request_id": "..."}
 
-Stack traces and provider messages are logged, never serialized. The stable
-``code`` field is what clients branch on; ``message`` is for humans and may
+Unexpected stack traces remain server-side. Raw provider messages are neither
+logged nor serialized; typed provider failures log only stable classification.
+The ``code`` field is what clients branch on; ``message`` is for humans and may
 change.
 """
 

@@ -1,12 +1,14 @@
-"""Local-only Ollama structured-output diagnostic; never used by production."""
+"""UNSAFE developer-only Ollama diagnostic that prints raw model output.
+
+Never invoke this utility from production startup or CI. It exists solely for
+local forensic debugging of structured-output compatibility.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
 from datetime import date
-
-from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.domain.enums import Attribute, ClaimType
@@ -15,9 +17,11 @@ from app.raters.ollama import OLLAMA_RATING_JSON_SCHEMA, OllamaTransport, _find_
 from app.raters.openai import _rating_input
 from app.raters.prompts import load_prompt
 from app.raters.schemas import SemanticRatingPayload
+from pydantic import ValidationError
 
 
 async def diagnose() -> int:
+    print("WARNING: developer-only command; raw provider content follows")
     settings = Settings()
     if settings.llm.provider != "ollama":
         print("diagnostic=FAILED: configure ACV_LLM__PROVIDER=ollama")
@@ -39,7 +43,11 @@ async def diagnose() -> int:
             messages=[
                 {
                     "role": "system",
-                    "content": load_prompt("rater", settings.llm.rater_prompt_version),
+                    "content": load_prompt(
+                        "rater",
+                        settings.llm.rater_prompt_version,
+                        root=settings.data.prompts_dir,
+                    ),
                 },
                 {
                     "role": "user",

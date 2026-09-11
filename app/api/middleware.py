@@ -48,7 +48,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
             # Health and metrics scrapes would otherwise dominate the log
             # volume without carrying any diagnostic value.
-            if request.url.path not in ("/health", "/metrics"):
+            if request.url.path not in ("/health", "/ready", "/metrics"):
                 logger.info(
                     "http_request",
                     method=request.method,

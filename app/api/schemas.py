@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Self
+from typing import Self, cast
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic_core import to_jsonable_python
 
 from app.domain.enums import (
     Attribute,
@@ -25,7 +26,13 @@ class APIModel(BaseModel):
 class VerifyClaimRequest(APIModel):
     """One commercial assertion and an optional authoritative record selector."""
 
-    claim: str = Field(min_length=1, max_length=20_000, strict=True)
+    claim: str = Field(
+        min_length=1,
+        max_length=1000,
+        strict=True,
+        description="Commercial assertion to verify; maximum 1,000 characters.",
+        examples=["Offer BACK159 costs $127.49."],
+    )
     reference_id: str | None = Field(default=None, min_length=1, max_length=64, strict=True)
     sku: str | None = Field(default=None, min_length=1, max_length=120, strict=True)
     region: str | None = Field(default=None, min_length=2, max_length=8, strict=True)
@@ -33,7 +40,10 @@ class VerifyClaimRequest(APIModel):
 
 
 class BatchVerifyRequest(APIModel):
-    claims: list[VerifyClaimRequest] = Field(min_length=1)
+    claims: list[VerifyClaimRequest] = Field(
+        min_length=1,
+        description="Ordered claims. Runtime maximum is configured by ACV_SERVER__MAX_BATCH_ITEMS.",
+    )
 
 
 class ClaimSummary(APIModel):
@@ -44,7 +54,7 @@ class ClaimSummary(APIModel):
 
 class EvidenceSummary(APIModel):
     reference_id: str | None
-    fields: dict[str, Any]
+    fields: dict[str, JsonValue]
     reference_updated_at: datetime | None
     reference_version: str | None
 
@@ -102,7 +112,7 @@ class VerifyClaimResponse(APIModel):
             ),
             evidence=EvidenceSummary(
                 reference_id=result.evidence.record_id,
-                fields=public_fields,
+                fields=cast(dict[str, JsonValue], to_jsonable_python(public_fields)),
                 reference_updated_at=result.evidence.record_updated_at,
                 reference_version=result.evidence.reference_version,
             ),
@@ -113,6 +123,7 @@ class VerifyClaimResponse(APIModel):
 class ErrorDetail(APIModel):
     code: str
     message: str
+    details: dict[str, JsonValue] | None = None
 
 
 class BatchItemResponse(APIModel):

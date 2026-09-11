@@ -4,26 +4,54 @@ from __future__ import annotations
 
 import httpx
 from app.api.middleware import REQUEST_ID_HEADER
+from app.bootstrap import ServiceContainer
+from app.core.config import LLMSettings
 
 
 class TestHealth:
-    async def test_reports_ok_with_loaded_catalog(self, client: httpx.AsyncClient) -> None:
+    async def test_liveness_is_cheap_and_dependency_free(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/health")
         assert response.status_code == 200
 
         body = response.json()
         assert body["status"] == "ok"
+        assert body["version"]
+        assert set(body) == {"status", "version"}
+
+    async def test_readiness_reports_loaded_catalog(self, client: httpx.AsyncClient) -> None:
+        response = await client.get("/ready")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ready"
         assert body["environment"] == "test"
         assert body["pipeline_config"] == "optimized"
         assert body["reference_records"] == 7
 
-    async def test_reports_dependency_detail(self, client: httpx.AsyncClient) -> None:
-        body = (await client.get("/health")).json()
+    async def test_readiness_reports_honest_dependency_state(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        body = (await client.get("/ready")).json()
         dependencies = {dep["name"]: dep for dep in body["dependencies"]}
-        assert dependencies["reference_repository"]["healthy"] is True
-        # The rater is reported but not probed: its outage must not fail the
-        # readiness check, because deterministic verification still works.
-        assert dependencies["llm_rater"]["detail"] == "provider=fake"
+        assert dependencies["reference_repository"]["state"] == "available"
+        assert dependencies["llm_rater"]["state"] == "not_required"
+
+    async def test_readiness_does_not_claim_unprobed_provider_is_available(
+        self, client: httpx.AsyncClient, container: ServiceContainer
+    ) -> None:
+        container.settings = container.settings.model_copy(
+            update={
+                "llm": LLMSettings(
+                    provider="ollama",
+                    base_url="http://127.0.0.1:11434/api",
+                    model="not-probed",
+                )
+            }
+        )
+
+        body = (await client.get("/ready")).json()
+        dependencies = {dep["name"]: dep for dep in body["dependencies"]}
+
+        assert dependencies["llm_rater"]["state"] == "configured_not_checked"
 
 
 class TestRequestIdentity:

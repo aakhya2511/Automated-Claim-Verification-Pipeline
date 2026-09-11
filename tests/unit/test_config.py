@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from app.core.config import LLMSettings, ObservabilitySettings, Settings
+from app.core.config import LLMSettings, Settings
 from app.core.exceptions import ConfigurationError
 from app.core.pipeline_config import PipelineConfig, load_pipeline_config
 
@@ -13,6 +13,8 @@ class TestSettings:
         settings = Settings(_env_file=None)
         assert settings.llm.provider == "fake"
         assert settings.llm.requires_credentials is False
+        assert settings.pipeline_config_file == "phase7/optimized_final.yaml"
+        assert settings.pipeline_config_path.is_file()
 
     def test_real_provider_without_key_fails_at_startup(self) -> None:
         # Better to refuse to boot than to 502 on the first ambiguous claim.
@@ -33,13 +35,10 @@ class TestSettings:
         with pytest.raises(ValueError, match="absolute HTTP"):
             LLMSettings(provider="ollama", base_url="localhost:11434/api")
 
-    def test_debug_endpoints_rejected_in_production(self) -> None:
-        with pytest.raises(ValueError, match="production"):
-            Settings(
-                _env_file=None,
-                environment="production",
-                observability=ObservabilitySettings(expose_debug_endpoints=True),
-            )
+    def test_removed_observability_switches_are_not_part_of_settings(self) -> None:
+        fields = Settings.model_fields["observability"].default.__class__.model_fields
+        assert "expose_debug_endpoints" not in fields
+        assert "log_claim_text" not in fields
 
     def test_nested_env_vars_are_read(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ACV_SERVER__PORT", "9123")

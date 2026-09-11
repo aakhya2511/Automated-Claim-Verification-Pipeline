@@ -1,0 +1,10 @@
+{
+  "arm": "baseline",
+  "config_hash": "157c34f47b5f8d9924b27569d4fdf9eae080d4c6a68c918ba08dea2be992a743",
+  "dataset_sha256": "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7",
+  "elapsed_ms_this_invocation": 10289691.650833003,
+  "error_analysis_reconciliation": "PASS",
+  "metrics_reconciliation": "PASS",
+  "prediction_count": 500,
+  "status": "COMPLETE"
+}

@@ -1,0 +1,10 @@
+{
+  "arm": "optimized",
+  "config_hash": "617bae9ca34f49c963b5f9e26ec1be030d18d19ddc5d7bff8e3718c5bfc5f1c1",
+  "dataset_sha256": "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7",
+  "elapsed_ms_this_invocation": 505385.0927080057,
+  "error_analysis_reconciliation": "PASS",
+  "metrics_reconciliation": "PASS",
+  "prediction_count": 500,
+  "status": "COMPLETE"
+}

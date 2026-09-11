@@ -127,6 +127,13 @@ class TestSingleVerification:
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "invalid_request"
 
+    async def test_claim_over_pipeline_limit_is_rejected_at_api_boundary(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        response = await client.post("/v1/claims/verify", json={"claim": "x" * 1001})
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "invalid_request"
+
     async def test_public_evidence_is_claim_scoped(self, client: httpx.AsyncClient) -> None:
         body = (
             await post_claim(

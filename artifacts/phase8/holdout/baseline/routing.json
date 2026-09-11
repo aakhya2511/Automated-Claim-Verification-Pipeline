@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "EXECUTION_FAILURE": 8,
+    "LLM_RATER": 492
+  },
+  "llm_extraction_rate": 0.0,
+  "llm_invocation_rate": 0.984,
+  "llm_rating_rate": 0.984,
+  "rates": {
+    "EXECUTION_FAILURE": 0.016,
+    "LLM_RATER": 0.984
+  }
+}

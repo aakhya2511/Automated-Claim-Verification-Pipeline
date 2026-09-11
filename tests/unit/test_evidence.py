@@ -234,6 +234,6 @@ class TestEvidenceMetadata:
         )
         assert evidence.entity_type is EntityType.PRODUCT
         assert evidence.display_name == "Noise Cancelling Headphones"
-        # updated_at feeds the cache key, so a catalog change invalidates
-        # affected entries instead of serving stale truth.
+        # Freshness is exposed in the audit trail so the evidence snapshot is
+        # reproducible even though the service implements no response cache.
         assert evidence.record_updated_at is not None

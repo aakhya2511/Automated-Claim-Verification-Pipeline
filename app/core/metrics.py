@@ -11,12 +11,14 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
+from prometheus_client import CollectorRegistry, Counter, Histogram, Info, generate_latest
+
+from app import __version__
 
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
-#: Buckets chosen around the sub-200ms target: dense below 200ms so the fast
-#: path is measurable, sparse above it where only outliers land.
+#: Dense buckets preserve millisecond fast-path resolution; the upper range
+#: captures local semantic inference that can legitimately take tens of seconds.
 _LATENCY_BUCKETS = (
     0.001,
     0.0025,
@@ -31,6 +33,11 @@ _LATENCY_BUCKETS = (
     2.5,
     5.0,
     10.0,
+    15.0,
+    30.0,
+    60.0,
+    120.0,
+    300.0,
 )
 
 
@@ -57,8 +64,6 @@ class Metrics(Protocol):
 
     def observe_batch_size(self, *, size: int) -> None: ...
 
-    def record_cache(self, *, hit: bool) -> None: ...
-
     def render(self) -> bytes: ...
 
 
@@ -71,6 +76,13 @@ class PrometheusMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         self.registry = registry or CollectorRegistry()
+
+        self._build = Info(
+            "claim_verification_build",
+            "Build metadata for the running service.",
+            registry=self.registry,
+        )
+        self._build.info({"version": __version__})
 
         self._requests = Counter(
             "verification_requests_total",
@@ -138,12 +150,6 @@ class PrometheusMetrics:
             buckets=(1, 2, 5, 10, 25, 50, 100, 250, 500),
             registry=self.registry,
         )
-        self._cache = Counter(
-            "cache_hits_total",
-            "Verification cache lookups, by result.",
-            labelnames=("result",),
-            registry=self.registry,
-        )
 
     def record_request(self, *, claim_type: str, outcome: str) -> None:
         self._requests.labels(claim_type=claim_type, outcome=outcome).inc()
@@ -176,9 +182,6 @@ class PrometheusMetrics:
     def observe_batch_size(self, *, size: int) -> None:
         self._batch_size.observe(size)
 
-    def record_cache(self, *, hit: bool) -> None:
-        self._cache.labels(result="hit" if hit else "miss").inc()
-
     def render(self) -> bytes:
         return generate_latest(self.registry)
 
@@ -209,8 +212,6 @@ class NullMetrics:
     def record_escalation(self, *, reason: str) -> None: ...
 
     def observe_batch_size(self, *, size: int) -> None: ...
-
-    def record_cache(self, *, hit: bool) -> None: ...
 
     def render(self) -> bytes:
         return b""

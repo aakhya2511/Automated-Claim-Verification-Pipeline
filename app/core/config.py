@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.exceptions import ConfigurationError
+from app.core.resources import DEFAULT_CATALOG_PATH, DEFAULT_CONFIGS_DIR, DEFAULT_PROMPTS_DIR
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -85,22 +86,19 @@ class LLMSettings(_Section):
 
 
 class DataSettings(_Section):
-    reference_catalog_path: Path = REPO_ROOT / "data" / "reference" / "catalog.jsonl"
+    #: The wheel includes a synthetic demonstration catalog. Production
+    #: deployments should normally point this at their governed source data.
+    reference_catalog_path: Path = DEFAULT_CATALOG_PATH
     evaluation_dataset_path: Path = REPO_ROOT / "data" / "evaluation" / "v1" / "benchmark_500.jsonl"
     artifacts_dir: Path = REPO_ROOT / "artifacts"
-    prompts_dir: Path = REPO_ROOT / "prompts"
-    configs_dir: Path = REPO_ROOT / "configs"
+    prompts_dir: Path = DEFAULT_PROMPTS_DIR
+    configs_dir: Path = DEFAULT_CONFIGS_DIR
 
 
 class ObservabilitySettings(_Section):
     log_level: str = "INFO"
     log_format: LogFormat = "json"
     metrics_enabled: bool = True
-    #: Raw claim text is user-supplied content; off by default so ordinary
-    #: production logs carry only structured, non-sensitive fields.
-    log_claim_text: bool = False
-    #: Guarded debug endpoints (config echo, cache stats). Never on in prod.
-    expose_debug_endpoints: bool = False
 
 
 class Settings(BaseSettings):
@@ -118,7 +116,7 @@ class Settings(BaseSettings):
     app_name: str = "automated-claim-verification"
     environment: Environment = "local"
     #: Pipeline profile loaded at startup, relative to ``data.configs_dir``.
-    pipeline_config_file: str = "optimized.yaml"
+    pipeline_config_file: str = "phase7/optimized_final.yaml"
 
     server: ServerSettings = ServerSettings()
     llm: LLMSettings = LLMSettings()
@@ -131,8 +129,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"llm.provider={self.llm.provider!r} requires ACV_LLM__API_KEY to be set"
             )
-        if self.environment == "production" and self.observability.expose_debug_endpoints:
-            raise ValueError("debug endpoints must not be exposed in production")
         return self
 
     @property

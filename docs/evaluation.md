@@ -1,109 +1,63 @@
-# Evaluation methodology
+# Evaluation and benchmark finality
 
-## V1 benchmark design
+All benchmark labels derive from the structured synthetic catalog, never from an LLM. Samples
+carry only claim, reference selector, region, evaluation date, and request identity into the
+production pipeline; expected labels and mutation metadata stay in evaluation code.
 
-The V1 benchmark is a frozen 500-sample holdout corpus. It is not a tuning split. A separate
-development corpus may be generated in a later phase; Phase 7 must not tune against these 500
-examples. After predictions are inspected, V1 may change only to correct a proven label,
-generator, or corruption bug, and that correction must be released as v1.1 or v2.
+## Three separate datasets
 
-Ground truth comes exclusively from the structured source-of-truth catalog, never from an
-LLM. The fixed generator seed is `20260909`. The generator chooses records through a
-deterministic least-used selector with stable hash tie-breaking, rather than taking the first
-N catalog rows. This spreads 500 examples across products, plans, offers, brands, regions,
-feature densities, price bands, and offer windows.
+| Dataset | Purpose | Final status |
+| --- | --- | --- |
+| 400-case development diagnostic | Phase 6 diagnosis and Phase 7 candidate selection | tuning data |
+| 500-case V1 holdout | one final locked baseline/optimized comparison | consumed |
+| 1,200-request workload | operational path and latency measurement | consumed performance run |
 
-## Composition and wording
+The 500-case holdout contains 200 supported, 220 controlled contradictions, 50 known-record
+insufficient-evidence, and 30 invalid-marketing claims. Contradictions change exactly one
+populated authoritative fact. Template families cover paraphrase, negation, qualifiers,
+aliases, regions, punctuation, numeric changes, and offer boundaries. The development corpus
+is content-separated from the holdout and was the only source used for optimization.
 
-The corpus contains 200 clean supported claims, 220 controlled contradictions, 50 known-record
-insufficient-evidence claims, and 30 realistic invalid marketing claims. Each supported
-production claim category receives a clean quota and exactly 20 injected mismatches. Clean and
-mutated examples use the same template families so verdicts cannot be inferred from mutation-
-specific prose.
+## Finality
 
-Templates include canonical forms, safe paraphrases, negation, punctuation variation, numeric
-qualifiers, aliases, region names, and year-omitted promotion dates. Safe equivalence is narrow:
-for example, free shipping may be rendered as complimentary delivery, while trial durations
-remain expressed in days rather than assuming every calendar month is 30 days.
+`holdout_evaluated = true`. It was evaluated exactly once per locked arm in Phase 8. It must
+not be rerun for tuning, relabeled, regenerated in place, described as untouched, or used for
+another independent comparison after a behavior change. A proven dataset correction requires
+a new version and explicit provenance.
 
-Difficulty is generation-only metadata. `EASY` means direct wording, `MODERATE` covers
-paraphrases and aliases, and `HARD` covers negation, qualifiers, subtle numeric changes,
-temporal phrasing, missing evidence, and semantic marketing language. It is never passed to the
-verifier.
+The committed `artifacts/phase8/holdout/finality.json` binds the holdout SHA-256 to both final
+prediction hashes. Small summaries, metrics, routing, confusion matrices, latency, candidate
+identity, and finality records are public evidence. Raw predictions/checkpoints and intermediate
+error-analysis payloads remain ignored. CI checks frozen hashes but executes no official corpus.
 
-## Controlled mutations
+## Reproducibility controls
 
-Every contradiction begins with a populated authoritative field and changes one semantic
-property. Numeric mutations include large, moderate, and subtle magnitudes. The independent
-validator uses the production-compatible comparison tolerance only to prove that a mutation is
-outside the accepted band; it does not call the production verifier or derive predictions.
+The generator seeds are `20260910` (development) and `20260909` (holdout). Evaluation snapshots
+record complete behavioral and operational config, stable config hash, catalog fingerprint,
+prompt/schema identities, provider/model, Ollama version, model digest, retry/concurrency values,
+and source identity. The final local model was `qwen2.5:7b`, digest
+`845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e`, on Ollama `0.33.3`.
+Credentials are excluded.
 
-Feature mutations preserve three states: an inclusion contradiction selects an explicitly
-excluded feature, an exclusion contradiction selects an explicitly included feature, and an
-unknown feature becomes `INSUFFICIENT_EVIDENCE`. Region mutations choose a code outside the
-exhaustive eligibility list. Date mutations change the authoritative offer end and always carry
-an explicit `as_of`. Date contexts are deterministically stratified across one day before the
-start, the exact start boundary, the active window, the exact end boundary, and one day after
-expiry; one template family omits the year to exercise `year_inferred` semantics. Shipping and
-availability mutations explicitly invert/change their source values. Each mutation records its
-type, source value, changed value, and magnitude.
+Accuracy includes execution failures in its denominator. Mismatch recall is detected injected
+contradictions divided by 220. A false positive is a non-contradictory case predicted
+`CONTRADICTED`. Quality evaluation used serial Ollama inference to remove concurrency as a
+comparison variable; the performance workload was run separately.
 
-## Insufficient and invalid cases
+## Published results
 
-Insufficient-evidence examples always use known records. They cover unknown features, absent
-minimum-purchase fields, and warranty assertions for a catalog that carries no warranty field.
-They are never labeled contradictions. Unknown record IDs are excluded because reference
-resolution failure is an execution concern, not a semantic label.
+The optimized holdout produced 500/500 correct, 220/220 mismatches detected, 0/280 false
+positives, and zero execution failures. The baseline produced 46.40% accuracy, 17/220 mismatch
+recall, 2/280 false positives, and eight timeouts. Attempted model calls fell from 500 to 35
+(93%); recorded tokens fell from 368,191 to 21,722 (94.1%).
 
-Invalid examples are realistic marketing language without a verifiable proposition. They use
-varied, nontrivial wording and named entities rather than only empty strings or gibberish.
-
-## Leakage prevention
-
-`EvaluationSample.to_verification_request()` explicitly copies only claim, reference ID, region,
-evaluation date, and request identity. Expected verdict, mutation values, source kind,
-difficulty, template ID, generator version, and ground-truth explanation remain evaluation-only.
-Tests assert these fields never cross the production request boundary. The audit and coverage
-artifacts are not imported by the production pipeline.
-
-## Validation and reproducibility
-
-`make generate-eval` reproduces JSONL, manifest, coverage, human-audit, and readable report
-artifacts. `make validate-eval` independently checks exact count and quotas, model schemas,
-unique IDs and claims, known references, mutation metadata, numeric tolerance, explicit feature
-and region conflicts, date context, missing-field semantics, catalog diversity, duplicates,
-manifest distributions, catalog fingerprint, and dataset SHA-256.
-
-No generation timestamp is stored. The same catalog bytes, generator version, and seed produce
-byte-identical JSONL and identical manifests. `manifest.json` is the machine-readable freeze
-record; `README.md` and `coverage.json` report statistics derived from the actual samples;
-`audit.md` contains a stratified 40-example manual-review view with source values and label
-explanations.
+The 1,200-request workload routed 1,110 requests deterministically and 90 to the LLM. Overall
+mean/p50/p95 were 1,012.75/1.512/11,569.27 ms. Deterministic mean/p95 were 2.328/6.861 ms.
+The LLM tail explains the gap; an overall sub-200 ms claim is unsupported.
 
 ## Limitations
 
-The catalog is synthetic and structurally realistic, so it does not reproduce every linguistic
-or merchandising pattern in live commerce. Templates are deterministic and may underrepresent
-open-ended language. Difficulty is a heuristic generation label, not an empirical measurement.
-The benchmark establishes controlled mismatch and abstention ground truth; it does not yet
-measure system performance, calibrate confidence, or validate resume metrics.
-
-## Phase 6 development baseline
-
-Phase 6 uses `data/evaluation/dev/v1/diagnostic.jsonl`, a separate deterministic
-400-sample corpus generated with seed `20260910`. Its validator compares content against the
-frozen holdout using exact claims, claim/reference pairs, semantic mutation signatures, and
-content fingerprints. The diagnostic corpus may be inspected and used for Phase 7; the frozen
-500-sample benchmark may not.
-
-`make freeze-baseline` records the redacted provider/model settings, complete behavioral
-configuration, prompt and schema versions, retry settings, catalog fingerprint, Git state when
-available, and a source-tree fingerprint. The stable `config_hash` covers every recorded field
-except itself. Credentials are never serialized.
-
-`make evaluate-baseline` runs only with a configured real provider and uses the production
-`HybridVerificationService`. It rejects the frozen holdout by content hash and rejects the fake
-rater. Execution failures remain in the primary accuracy denominator. A false positive is fixed
-as a non-`CONTRADICTED` ground truth predicted `CONTRADICTED`; a missed mismatch is an injected
-`CONTRADICTED` sample receiving any other verdict or an execution failure. Wilson 95% intervals
-are reported for accuracy, mismatch recall, and false-positive rate.
+The catalog and corpora are synthetic and their language distribution is controlled. A local
+Qwen result does not characterize all models or real commercial traffic. One perfect consumed
+holdout does not establish universal correctness, robustness under distribution shift, or
+confidence calibration.

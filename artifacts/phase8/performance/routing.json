@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "DETERMINISTIC": 1110,
+    "LLM_RATER": 90
+  },
+  "error_rate": 0.0,
+  "execution_failures": 0,
+  "llm_invocation_rate": 0.075,
+  "llm_invocations": 90,
+  "ollama_parallelism": "server default; effective in-flight model requests capped at 1",
+  "provider_concurrency": 1,
+  "queue_behavior": "serial client; no application-level queue contention",
+  "request_concurrency": 1,
+  "service_batch_concurrency": 1
+}

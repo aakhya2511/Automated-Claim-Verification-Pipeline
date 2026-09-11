@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -10,7 +11,7 @@ from app.core.config import LLMSettings
 from app.core.exceptions import RaterInvalidResponseError, RaterSchemaValidationError
 from app.domain.enums import Attribute, ClaimType, Operator, Qualifier
 from app.domain.models import ClaimExtraction, ExtractionContext
-from app.raters.prompts import load_prompt
+from app.raters.prompts import PROMPTS_ROOT, load_prompt
 from app.raters.transport import OpenAIResponsesTransport
 
 EXTRACTION_JSON_SCHEMA: dict[str, object] = {
@@ -52,11 +53,14 @@ class OpenAIClaimExtractor:
         *,
         transport: OpenAIResponsesTransport | None = None,
         prompt_version: str | None = None,
+        prompts_dir: Path | None = None,
     ) -> None:
         self._settings = settings
         self._transport = transport or OpenAIResponsesTransport(settings)
         self._prompt_version = prompt_version or settings.extraction_prompt_version
-        self._prompt = load_prompt("extractor", self._prompt_version)
+        self._prompt = load_prompt(
+            "extractor", self._prompt_version, root=prompts_dir or PROMPTS_ROOT
+        )
 
     async def extract(self, raw_claim: str, *, context: ExtractionContext) -> ClaimExtraction:
         body = {

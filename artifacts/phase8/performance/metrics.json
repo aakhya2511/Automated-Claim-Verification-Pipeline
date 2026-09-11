@@ -1,0 +1,71 @@
+{
+  "config_hash": "617bae9ca34f49c963b5f9e26ec1be030d18d19ddc5d7bff8e3718c5bfc5f1c1",
+  "error_rate": 0.0,
+  "latency": {
+    "deterministic": {
+      "count": 1110,
+      "maximum_ms": 30.199,
+      "mean_ms": 2.32750990990991,
+      "minimum_ms": 0.249,
+      "p50_ms": 1.355,
+      "p90_ms": 4.4568,
+      "p95_ms": 6.861399999999994,
+      "p99_ms": 16.669020000000092
+    },
+    "llm_routed": {
+      "count": 90,
+      "maximum_ms": 25663.996,
+      "mean_ms": 13474.568000000001,
+      "minimum_ms": 8262.904,
+      "p50_ms": 12736.336,
+      "p90_ms": 18976.92310000001,
+      "p95_ms": 21543.80845,
+      "p99_ms": 22493.69318
+    },
+    "overall_service": {
+      "count": 1200,
+      "maximum_ms": 25663.996,
+      "mean_ms": 1012.7455466666667,
+      "minimum_ms": 0.249,
+      "p50_ms": 1.512,
+      "p90_ms": 10.515400000000007,
+      "p95_ms": 11569.265799999992,
+      "p99_ms": 17525.90357
+    },
+    "overall_wall": {
+      "count": 1200,
+      "maximum_ms": 25686.05099999695,
+      "mean_ms": 1014.5861210782582,
+      "minimum_ms": 0.4390420072013512,
+      "p50_ms": 2.413395995972678,
+      "p90_ms": 13.875511899823346,
+      "p95_ms": 11582.152485689578,
+      "p99_ms": 17539.274563565556
+    }
+  },
+  "llm_invocation_rate": 0.075,
+  "measured_serial_wall_seconds": 1217.50334529391,
+  "model": "qwen2.5:7b",
+  "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+  "routing": {
+    "counts": {
+      "DETERMINISTIC": 1110,
+      "LLM_RATER": 90
+    },
+    "error_rate": 0.0,
+    "execution_failures": 0,
+    "llm_invocation_rate": 0.075,
+    "llm_invocations": 90,
+    "ollama_parallelism": "server default; effective in-flight model requests capped at 1",
+    "provider_concurrency": 1,
+    "queue_behavior": "serial client; no application-level queue contention",
+    "request_concurrency": 1,
+    "service_batch_concurrency": 1
+  },
+  "sample_count": 1200,
+  "source_commit": "47bea80e741d51fa4144c93a7d69c2462541eebe",
+  "source_tree_sha256": "3d46b91b6959de53247fbc9b42c7e4b4a12ab67d48391679af8cdf97e88319b2",
+  "status": "COMPLETE",
+  "throughput_requests_per_second": 0.9856235751946254,
+  "workload_sha256": "4e91cd16260afc5f4962c1923a49bd2eb8e3d189eea0ab3e22a56d2e5a3d94f3"
+}

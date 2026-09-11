@@ -1,0 +1,511 @@
+{
+  "baseline": {
+    "accuracy": 0.464,
+    "confusion_matrix": {
+      "CONTRADICTED": {
+        "CONTRADICTED": 17,
+        "INSUFFICIENT_EVIDENCE": 167,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 32
+      },
+      "INSUFFICIENT_EVIDENCE": {
+        "CONTRADICTED": 0,
+        "INSUFFICIENT_EVIDENCE": 31,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 18
+      },
+      "INVALID_CLAIM": {
+        "CONTRADICTED": 0,
+        "INSUFFICIENT_EVIDENCE": 11,
+        "INVALID_CLAIM": 1,
+        "SUPPORTED": 18
+      },
+      "SUPPORTED": {
+        "CONTRADICTED": 2,
+        "INSUFFICIENT_EVIDENCE": 12,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 183
+      }
+    },
+    "execution_failures": 8,
+    "false_positive": {
+      "count": 2,
+      "eligible_samples": 280,
+      "rate": 0.007142857142857143,
+      "wilson_95": {
+        "high": 0.02566517304692658,
+        "low": 0.001961019593408128
+      }
+    },
+    "latency": {
+      "deterministic": {
+        "count": 0,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "minimum": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "llm_routed": {
+        "count": 492,
+        "maximum": 59105.385,
+        "mean": 21345.91754471545,
+        "minimum": 7092.684,
+        "p50": 18833.639499999997,
+        "p90": 34509.7595,
+        "p95": 41913.775149999994,
+        "p99": 52364.024899999975
+      },
+      "mean_attempts": 1.0,
+      "overall": {
+        "count": 500,
+        "maximum": 61641.45449998614,
+        "mean": 21974.262027084,
+        "minimum": 7092.684,
+        "p50": 18932.1455,
+        "p90": 36157.7205,
+        "p95": 45945.494099999974,
+        "p99": 60343.34787675078
+      },
+      "provider": {
+        "count": 492,
+        "maximum": 58977.34083299292,
+        "mean": 21320.083947347346,
+        "minimum": 7090.1092079948285,
+        "p50": 18818.553229495592,
+        "p90": 34422.195512490005,
+        "p95": 41833.28227515157,
+        "p99": 52306.833085507875
+      },
+      "provider_error_count": 8,
+      "retry_count": 0,
+      "stages": {
+        "decision": {
+          "count": 492,
+          "maximum": 6.774,
+          "mean": 0.5371646341463415,
+          "minimum": 0.019,
+          "p50": 0.173,
+          "p90": 1.4983000000000004,
+          "p95": 2.0891499999999987,
+          "p99": 5.105289999999985
+        },
+        "extraction": {
+          "count": 492,
+          "maximum": 0.0,
+          "mean": 0.0,
+          "minimum": 0.0,
+          "p50": 0.0,
+          "p90": 0.0,
+          "p95": 0.0,
+          "p99": 0.0
+        },
+        "normalization": {
+          "count": 492,
+          "maximum": 83.944,
+          "mean": 2.1340040650406507,
+          "minimum": 0.035,
+          "p50": 0.8855,
+          "p90": 4.717300000000002,
+          "p95": 7.069,
+          "p99": 15.706549999999982
+        },
+        "rating": {
+          "count": 492,
+          "maximum": 59090.433,
+          "mean": 21337.323028455285,
+          "minimum": 7090.907,
+          "p50": 18825.602,
+          "p90": 34469.1131,
+          "p95": 41891.81014999999,
+          "p99": 52350.11065999998
+        },
+        "retrieval": {
+          "count": 492,
+          "maximum": 64.49,
+          "mean": 3.4945650406504067,
+          "minimum": 0.097,
+          "p50": 1.271,
+          "p90": 9.2993,
+          "p95": 13.155249999999999,
+          "p99": 23.145699999999877
+        },
+        "rules": {
+          "count": 492,
+          "maximum": 8.109,
+          "mean": 0.22410365853658537,
+          "minimum": 0.012,
+          "p50": 0.058,
+          "p90": 0.394,
+          "p95": 1.1432999999999995,
+          "p99": 2.754219999999999
+        },
+        "total": {
+          "count": 492,
+          "maximum": 59105.385,
+          "mean": 21345.91754471545,
+          "minimum": 7092.684,
+          "p50": 18833.639499999997,
+          "p90": 34509.7595,
+          "p95": 41913.775149999994,
+          "p99": 52364.024899999975
+        }
+      },
+      "tokens": {
+        "input_tokens": 323964,
+        "output_tokens": 44227,
+        "total_tokens": 368191
+      }
+    },
+    "macro_f1": 0.31177194114055773,
+    "macro_precision": 0.6910230001641445,
+    "macro_recall": 0.4114015151515152,
+    "mismatch": {
+      "detected": 17,
+      "false_negatives": 203,
+      "missed_by_outcome": {
+        "EXECUTION_FAILURE": 4,
+        "INSUFFICIENT_EVIDENCE": 167,
+        "SUPPORTED": 32
+      },
+      "recall": 0.07727272727272727,
+      "total": 220,
+      "wilson_95": {
+        "high": 0.12025234946911229,
+        "low": 0.04880238695041145
+      }
+    },
+    "per_verdict": {
+      "CONTRADICTED": {
+        "f1": 0.14225941422594143,
+        "precision": 0.8947368421052632,
+        "recall": 0.07727272727272727,
+        "support": 220
+      },
+      "INSUFFICIENT_EVIDENCE": {
+        "f1": 0.2287822878228782,
+        "precision": 0.14027149321266968,
+        "recall": 0.62,
+        "support": 50
+      },
+      "INVALID_CLAIM": {
+        "f1": 0.06451612903225806,
+        "precision": 1.0,
+        "recall": 0.03333333333333333,
+        "support": 30
+      },
+      "SUPPORTED": {
+        "f1": 0.8115299334811531,
+        "precision": 0.7290836653386454,
+        "recall": 0.915,
+        "support": 200
+      }
+    },
+    "routing": {
+      "counts": {
+        "EXECUTION_FAILURE": 8,
+        "LLM_RATER": 492
+      },
+      "llm_extraction_rate": 0.0,
+      "llm_invocation_rate": 0.984,
+      "llm_rating_rate": 0.984,
+      "rates": {
+        "EXECUTION_FAILURE": 0.016,
+        "LLM_RATER": 0.984
+      }
+    },
+    "tokens": {
+      "input_tokens": 323964,
+      "output_tokens": 44227,
+      "total_tokens": 368191
+    }
+  },
+  "benchmark_finality": {
+    "baseline_prediction_sha256": "d8a6ae39bad56ca63c4e3d1750817d8557e75669d160e0d299d9927fb235e463",
+    "first_evaluation_timestamp": "2026-09-10T17:31:46.118589+00:00",
+    "holdout_dataset_sha256": "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7",
+    "holdout_evaluated": true,
+    "optimized_prediction_sha256": "68b87f0712b40aae11cac4592e54b6e8cc3c8142f0e6e2bbdfbabafbe4cfa2bd"
+  },
+  "changes": {
+    "accuracy_absolute": 0.536,
+    "attempted_llm_call_relative_reduction": 0.93,
+    "attempted_llm_calls": {
+      "baseline": 500,
+      "optimized": 35
+    },
+    "false_positive_relative_reduction": 1.0,
+    "macro_f1_absolute": 0.6882280588594423,
+    "mismatch_recall_absolute": 0.9227272727272727,
+    "recorded_successful_llm_result_relative_reduction": 0.9288617886178862,
+    "recorded_successful_llm_results": {
+      "baseline": 492,
+      "optimized": 35
+    },
+    "token_relative_reduction": 0.9410034465807149,
+    "total_tokens": {
+      "baseline": 368191,
+      "optimized": 21722
+    }
+  },
+  "dataset_sha256": "0868111bf882b702738fc82720c2ccf51bbe2776645740a7fc20a93f724af9c7",
+  "generalization_gap": {
+    "accuracy_absolute": 0.0,
+    "development": {
+      "accuracy": 1.0,
+      "false_positive_rate": 0.0,
+      "mismatch_recall": 1.0
+    },
+    "false_positive_rate_absolute": 0.0,
+    "holdout": {
+      "accuracy": 1.0,
+      "false_positive_rate": 0.0,
+      "mismatch_recall": 1.0
+    },
+    "mismatch_recall_absolute": 0.0
+  },
+  "identical_sample_ids_and_order": true,
+  "optimized": {
+    "accuracy": 1.0,
+    "confusion_matrix": {
+      "CONTRADICTED": {
+        "CONTRADICTED": 220,
+        "INSUFFICIENT_EVIDENCE": 0,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 0
+      },
+      "INSUFFICIENT_EVIDENCE": {
+        "CONTRADICTED": 0,
+        "INSUFFICIENT_EVIDENCE": 50,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 0
+      },
+      "INVALID_CLAIM": {
+        "CONTRADICTED": 0,
+        "INSUFFICIENT_EVIDENCE": 0,
+        "INVALID_CLAIM": 30,
+        "SUPPORTED": 0
+      },
+      "SUPPORTED": {
+        "CONTRADICTED": 0,
+        "INSUFFICIENT_EVIDENCE": 0,
+        "INVALID_CLAIM": 0,
+        "SUPPORTED": 200
+      }
+    },
+    "execution_failures": 0,
+    "false_positive": {
+      "count": 0,
+      "eligible_samples": 280,
+      "rate": 0.0,
+      "wilson_95": {
+        "high": 0.013533818620629409,
+        "low": 8.673617379884035e-19
+      }
+    },
+    "latency": {
+      "deterministic": {
+        "count": 465,
+        "maximum": 36.4,
+        "mean": 2.365090322580645,
+        "minimum": 0.149,
+        "p50": 1.305,
+        "p90": 4.463,
+        "p95": 6.838999999999992,
+        "p99": 15.839960000000033
+      },
+      "llm_routed": {
+        "count": 35,
+        "maximum": 20042.833,
+        "mean": 14265.423114285715,
+        "minimum": 10723.035,
+        "p50": 13399.453,
+        "p90": 18218.417999999998,
+        "p95": 18850.7853,
+        "p99": 19647.897159999997
+      },
+      "mean_attempts": 1.0,
+      "overall": {
+        "count": 500,
+        "maximum": 20042.833,
+        "mean": 1000.779152,
+        "minimum": 0.149,
+        "p50": 1.42,
+        "p90": 9.60150000000001,
+        "p95": 12651.480099999999,
+        "p99": 17846.031479999998
+      },
+      "provider": {
+        "count": 35,
+        "maximum": 20004.001499997685,
+        "mean": 14249.618433344378,
+        "minimum": 10709.06316699984,
+        "p50": 13384.897833006107,
+        "p90": 18188.84304120147,
+        "p95": 18837.036166299367,
+        "p99": 19617.760919282442
+      },
+      "provider_error_count": 0,
+      "retry_count": 0,
+      "stages": {
+        "decision": {
+          "count": 500,
+          "maximum": 3.58,
+          "mean": 0.062234000000000005,
+          "minimum": 0.002,
+          "p50": 0.01,
+          "p90": 0.07020000000000005,
+          "p95": 0.2420999999999999,
+          "p99": 1.1524799999999995
+        },
+        "extraction": {
+          "count": 500,
+          "maximum": 0.0,
+          "mean": 0.0,
+          "minimum": 0.0,
+          "p50": 0.0,
+          "p90": 0.0,
+          "p95": 0.0,
+          "p99": 0.0
+        },
+        "normalization": {
+          "count": 500,
+          "maximum": 23.454,
+          "mean": 1.670568,
+          "minimum": 0.102,
+          "p50": 0.792,
+          "p90": 3.4598000000000004,
+          "p95": 5.037199999999997,
+          "p99": 10.704199999999995
+        },
+        "rating": {
+          "count": 500,
+          "maximum": 20041.349,
+          "mean": 998.1958179999999,
+          "minimum": 0.0,
+          "p50": 0.0,
+          "p90": 0.0,
+          "p95": 12640.732199999997,
+          "p99": 17839.174589999995
+        },
+        "retrieval": {
+          "count": 500,
+          "maximum": 13.907,
+          "mean": 0.38905399999999996,
+          "minimum": 0.013,
+          "p50": 0.125,
+          "p90": 0.760600000000001,
+          "p95": 1.9502999999999906,
+          "p99": 3.64007
+        },
+        "rules": {
+          "count": 500,
+          "maximum": 5.503,
+          "mean": 0.265988,
+          "minimum": 0.009,
+          "p50": 0.122,
+          "p90": 0.4814000000000003,
+          "p95": 1.2438999999999982,
+          "p99": 2.515039999999998
+        },
+        "total": {
+          "count": 500,
+          "maximum": 20042.833,
+          "mean": 1000.779152,
+          "minimum": 0.149,
+          "p50": 1.42,
+          "p90": 9.60150000000001,
+          "p95": 12651.480099999999,
+          "p99": 17846.031479999998
+        }
+      },
+      "tokens": {
+        "input_tokens": 19159,
+        "output_tokens": 2563,
+        "total_tokens": 21722
+      }
+    },
+    "macro_f1": 1.0,
+    "macro_precision": 1.0,
+    "macro_recall": 1.0,
+    "mismatch": {
+      "detected": 220,
+      "false_negatives": 0,
+      "missed_by_outcome": {},
+      "recall": 1.0,
+      "total": 220,
+      "wilson_95": {
+        "high": 0.9999999999999999,
+        "low": 0.9828384838048642
+      }
+    },
+    "per_verdict": {
+      "CONTRADICTED": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 220
+      },
+      "INSUFFICIENT_EVIDENCE": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 50
+      },
+      "INVALID_CLAIM": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 30
+      },
+      "SUPPORTED": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 200
+      }
+    },
+    "routing": {
+      "counts": {
+        "DETERMINISTIC": 465,
+        "LLM_RATER": 35
+      },
+      "llm_extraction_rate": 0.0,
+      "llm_invocation_rate": 0.07,
+      "llm_rating_rate": 0.07,
+      "rates": {
+        "DETERMINISTIC": 0.93,
+        "LLM_RATER": 0.07
+      }
+    },
+    "tokens": {
+      "input_tokens": 19159,
+      "output_tokens": 2563,
+      "total_tokens": 21722
+    }
+  },
+  "reconciliation": {
+    "baseline": {
+      "contradictions": 220,
+      "execution_failures": 8,
+      "matrix_plus_failures": 500,
+      "non_contradicted": 280,
+      "routing_plus_failures": 500,
+      "semantic_results": 492,
+      "total": 500
+    },
+    "optimized": {
+      "contradictions": 220,
+      "execution_failures": 0,
+      "matrix_plus_failures": 500,
+      "non_contradicted": 280,
+      "routing_plus_failures": 500,
+      "semantic_results": 500,
+      "total": 500
+    }
+  },
+  "sample_count_per_arm": 500,
+  "status": "PASS"
+}

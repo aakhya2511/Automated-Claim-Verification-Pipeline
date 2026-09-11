@@ -134,25 +134,3 @@ class VerificationService(Protocol):
     async def verify_batch(
         self, requests: list[VerificationRequest]
     ) -> list[VerificationResult | VerificationFailure]: ...
-
-
-@runtime_checkable
-class ResultCache(Protocol):
-    """Redis-style cache abstraction for semantically safe response reuse.
-
-    The default implementation is an in-process TTL map; the interface is
-    intentionally the small subset of Redis semantics we need so a real Redis
-    client can be dropped in without touching call sites.
-    """
-
-    async def get(self, key: str) -> str | None: ...
-
-    async def set(self, key: str, value: str, *, ttl_seconds: int) -> None: ...
-
-    async def clear(self) -> None: ...
-
-    @property
-    def hits(self) -> int: ...
-
-    @property
-    def misses(self) -> int: ...

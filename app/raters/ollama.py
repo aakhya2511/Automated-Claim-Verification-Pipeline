@@ -8,6 +8,7 @@ import random
 import re
 from collections.abc import Callable
 from datetime import date
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Never
 from uuid import uuid4
@@ -38,7 +39,7 @@ from app.domain.models import (
 )
 from app.raters.extractor import EXTRACTION_JSON_SCHEMA
 from app.raters.openai import _rating_input
-from app.raters.prompts import load_prompt
+from app.raters.prompts import PROMPTS_ROOT, load_prompt
 from app.raters.schemas import SemanticRatingPayload
 from app.raters.transport import ProviderResponse, Sleeper
 
@@ -295,11 +296,12 @@ class OllamaRater:
         *,
         transport: OllamaTransport | None = None,
         prompt_version: str | None = None,
+        prompts_dir: Path | None = None,
     ) -> None:
         self._settings = settings
         self._transport = transport or OllamaTransport(settings)
         self._prompt_version = prompt_version or settings.rater_prompt_version
-        self._prompt = load_prompt("rater", self._prompt_version)
+        self._prompt = load_prompt("rater", self._prompt_version, root=prompts_dir or PROMPTS_ROOT)
 
     @property
     def provider_name(self) -> str:
@@ -373,11 +375,14 @@ class OllamaClaimExtractor:
         *,
         transport: OllamaTransport | None = None,
         prompt_version: str | None = None,
+        prompts_dir: Path | None = None,
     ) -> None:
         self._settings = settings
         self._transport = transport or OllamaTransport(settings)
         self._prompt_version = prompt_version or settings.extraction_prompt_version
-        self._prompt = load_prompt("extractor", self._prompt_version)
+        self._prompt = load_prompt(
+            "extractor", self._prompt_version, root=prompts_dir or PROMPTS_ROOT
+        )
 
     async def extract(self, raw_claim: str, *, context: ExtractionContext) -> ClaimExtraction:
         provider = await self._transport.chat(
