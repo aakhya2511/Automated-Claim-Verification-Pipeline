@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      ACV_ENVIRONMENT: development
+      ACV_ENVIRONMENT: test
       ACV_LLM__PROVIDER: fake
     steps:
       - uses: actions/checkout@v4
